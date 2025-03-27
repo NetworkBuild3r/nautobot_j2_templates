@@ -3,18 +3,15 @@
 {% set snmp = mon_cfg.snmp | default({}) %}
 
 {% if snmp and snmp is not none %}
-! ===============================================
 ! SNMP Configuration
-! Generated on: {{ "now" | strftime("%Y-%m-%d %H:%M:%S") }}
 ! Device: {{ device.hostname | default("Unknown") }}
-! ===============================================
 
 ! SNMP Communities
 {% if 'community_ro' in snmp and snmp['community_ro'] %}
-snmp-server community {{ snmp['community_ro'] }} RO{% if 'community_ro_timeout' in snmp and snmp['community_ro_timeout'] %} {{ snmp['community_ro_timeout'] }}{% endif %}
+snmp-server community {{ snmp['community_ro'] }} RO
 {% endif %}
 {% if 'community_rw' in snmp and snmp['community_rw'] %}
-snmp-server community {{ snmp['community_rw'] }} RW{% if 'community_rw_timeout' in snmp and snmp['community_rw_timeout'] %} {{ snmp['community_rw_timeout'] }}{% endif %}
+snmp-server community {{ snmp['community_rw'] }} RW
 {% endif %}
 
 ! Contact & Location Information
@@ -26,12 +23,10 @@ snmp-server location "{{ snmp['location'] }}"
 {% endif %}
 
 ! SNMP Traps Enablement
-{% if 'enable_traps' in snmp and snmp['enable_traps'] and snmp['enable_traps'] is iterable %}
+{% if 'enable_traps' in snmp and snmp['enable_traps'] %}
 {% for trap in snmp['enable_traps'] %}
 snmp-server enable traps {{ trap }}
 {% endfor %}
-{% else %}
-! No SNMP traps defined or invalid trap list
 {% endif %}
 
 ! Logging and Trap Host Configuration
@@ -46,40 +41,31 @@ logging source-interface {{ snmp['logging_source_interface'] }}
 {% endif %}
 
 ! SNMP Access Control List - ACL51
-{% if 'acl_51' in snmp and snmp['acl_51'] and snmp['acl_51'] is iterable %}
+{% if 'acl_51' in snmp and snmp['acl_51'] %}
 ip access-list standard ACL51
 {% for entry in snmp['acl_51'] %}
  {{ entry }}
 {% endfor %}
-{% else %}
-! No ACL51 entries defined or invalid list
 {% endif %}
 
 ! SNMP Access Control List - ACL60
-{% if 'acl_60' in snmp and snmp['acl_60'] and snmp['acl_60'] is iterable %}
+{% if 'acl_60' in snmp and snmp['acl_60'] %}
 ip access-list standard ACL60
 {% for entry in snmp['acl_60'] %}
  {{ entry }}
 {% endfor %}
-{% else %}
-! No ACL60 entries defined or invalid list
 {% endif %}
 
 ! Additional SNMP Hosts
-{% if 'hosts' in snmp and snmp['hosts'] and snmp['hosts'] is iterable %}
+{% if 'hosts' in snmp and snmp['hosts'] %}
 {% for host in snmp['hosts'] %}
 {% if 'ip' in host and host['ip'] and 'community' in host and host['community'] %}
 snmp-server host {{ host['ip'] }} version 2c {{ host['community'] }}
 {% endif %}
 {% endfor %}
-{% else %}
-! No additional SNMP hosts defined or invalid host list
 {% endif %}
 
 {% else %}
-! ===============================================
 ! SNMP Configuration Error
-! No valid SNMP data found in config_context.cisco_snmp_ios.monitoring_config.snmp
-! Check device configuration or GraphQL query output
-! ===============================================
+! No valid SNMP data found in config_context
 {% endif %}
