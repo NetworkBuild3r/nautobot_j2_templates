@@ -1,2 +1,29 @@
 ! Test Configuration
 hostname {{ obj.name }}
+
+! SNMP Configuration
+snmp-server contact {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.contact }}
+snmp-server location {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.location }}
+snmp-server trap-source {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.trap_source }}
+
+! SNMP Communities
+snmp-server community {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.community_ro }} RO {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.community_ro_timeout }}
+snmp-server community {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.community_rw }} RW {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.community_rw_timeout }}
+
+! SNMP Hosts
+{% for host in obj.config_context.cisco_snmp_ios.monitoring_config.snmp.hosts %}
+snmp-server host {{ host.ip }} {{ host.community }}
+{% endfor %}
+
+! SNMP Traps
+{% for trap in obj.config_context.cisco_snmp_ios.monitoring_config.snmp.enable_traps %}
+snmp-server enable traps {{ trap }}
+{% endfor %}
+
+! Access Lists
+access-list 51 {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.acl_51 | join('\naccess-list 51 ') }}
+access-list 60 {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.acl_60 | join('\naccess-list 60 ') }}
+
+! Logging
+logging host {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.logging_host }}
+logging source-interface {{ obj.config_context.cisco_snmp_ios.monitoring_config.snmp.logging_source_interface }}
