@@ -1,0 +1,69 @@
+{% set snmp_CTX = device.config_context.cisco_snmp_ios | default({}) %}
+{% set mon_cfg = snmp_CTX.monitoring_config | default({}) %}
+{% set snmp = mon_cfg.snmp | default({}) %}
+
+{% if snmp %}
+! ===============================================
+! SNMP Configuration
+! ===============================================
+
+! SNMP Communities
+{% if 'community_ro' in snmp%}
+snmp-server community {{ snmp['community_ro'] }} RO
+{% endif%}
+{% if 'community_rw' in snmp%}
+snmp-server community {{ snmp['community_rw'] }} RW
+{% endif%}
+
+! Contact & Location
+{% if 'contact' in snmp%}
+snmp-server contact "{{ snmp['contact'] }}"
+{% endif%}
+{% if 'location' in snmp%}
+snmp-server location "{{ snmp['location'] }}"
+{% endif%}
+
+! Enable SNMP Traps
+{% if 'enable_traps' in snmp and snmp['enable_traps']%}
+{% for trap in snmp['enable_traps']%}
+snmp-server enable traps {{ trap }}
+{% endfor%}
+{% endif%}
+
+! Logging/Trap Configuration
+{% if 'logging_host' in snmp and 'community_ro' in snmp%}
+snmp-server host {{ snmp['logging_host'] }} version 2c {{ snmp['community_ro'] }}
+{% endif%}
+{% if 'trap_source' in snmp%}
+snmp-server trap-source {{ snmp['trap_source'] }}
+{% endif%}
+{% if 'logging_source_interface' in snmp%}
+logging source-interface {{ snmp['logging_source_interface'] }}
+{% endif%}
+
+! SNMP ACL 51
+{% if 'acl_51' in snmp and snmp['acl_51']%}
+ip access-list standard ACL51
+{% for entry in snmp['acl_51']%}
+  {{ entry }}
+{% endfor%}
+{% endif%}
+
+! SNMP ACL 60
+{% if 'acl_60' in snmp and snmp['acl_60']%}
+ip access-list standard ACL60
+{% for entry in snmp['acl_60']%}
+  {{ entry }}
+{% endfor%}
+{% endif%}
+
+! SNMP Hosts
+{% if 'hosts' in snmp and snmp['hosts']%}
+{% for host in snmp['hosts']%}
+snmp-server host {{ host['ip'] }} version 2c {{ host['community'] }}
+{% endfor%}
+{% endif%}
+
+{% else%}
+! No SNMP data found in config context
+{% endif%}
