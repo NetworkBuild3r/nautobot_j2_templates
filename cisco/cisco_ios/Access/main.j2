@@ -1,2 +1,3 @@
 hostname {{ obj.name }}
-snmp-server community {% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %} RO
+{% raw %}{{ obj.secrets_group.name | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %}
+
