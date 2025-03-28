@@ -1,2 +1,3 @@
 hostname {{ obj.name }}
-snmp-server community {{ get_secret("snmp_community_ro") }} RO
+snmp-server community {{ get_secret(request.user, obj.id, "dcim.Device", "snmp_community_ro") }} RO
+
