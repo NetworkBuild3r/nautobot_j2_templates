@@ -1,5 +1,24 @@
 hostname {{ obj.name }}
 
 {# Include the common SNMP configuration #}
-{% include "../../common/ios_snmp.j2" %}
+{#{% include "../../common/ios_snmp.j2" %}#}
+
+
+{% set snmp = config_context.cisco_snmp_ios.monitoring_config.snmp %}
+! SNMP Configuration
+snmp-server community {{ secret(snmp.community_ro) }} RO {{ snmp.community_ro_timeout }}
+snmp-server community {{ secret(snmp.community_rw) }} RW {{ snmp.community_rw_timeout }}
+snmp-server trap-source {{ snmp.trap_source }}
+snmp-server location "{{ obj.location.physical_address if snmp.use_device_location else snmp.location }}"
+snmp-server contact "{{ snmp.contact }}"
+
+{# SNMP Traps #}
+{% for trap in snmp.enable_traps %}
+snmp-server enable traps {{ trap }}
+{% endfor %}
+
+{# SNMP Hosts #}
+{% for host in snmp.hosts %}
+snmp-server host {{ host.ip }} {% if host.version is defined %}version {{ host.version }} {% endif %}{{ secret(host.secret_key) if host.secret_key is defined else host.community }}
+{% endfor %}
 
