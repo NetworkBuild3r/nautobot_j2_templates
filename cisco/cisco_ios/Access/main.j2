@@ -1,3 +1,2 @@
-hostname {{ obj.name }}
-{% raw %}{{ obj.secrets_group.name | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %}
-
+hostname phx-ios01
+{% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %}
