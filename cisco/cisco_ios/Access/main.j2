@@ -1,2 +1,2 @@
 hostname {{ obj.name }}
-snmp-server community {{ secret('snmp_community_ro') }} RO
+snmp-server community {{ get_secret("snmp_community_ro") }} RO
