@@ -1,11 +1,11 @@
 hostname {{ obj.name }}
 
-{% set snmp = graphql_data.config_context.cisco_snmp_ios.monitoring_config.snmp %}
+{% set snmp = obj.config_context.cisco_snmp_ios.monitoring_config.snmp %}
 ! SNMP Configuration
-snmp-server community {{ secret(snmp.community_ro) }} RO {{ snmp.community_ro_timeout }}
-snmp-server community {{ secret(snmp.community_rw) }} RW {{ snmp.community_rw_timeout }}
+snmp-server community {{ snmp.community_ro }} RO {{ snmp.community_ro_timeout }}
+snmp-server community {{ snmp.community_rw }} RW {{ snmp.community_rw_timeout }}
 snmp-server trap-source {{ snmp.trap_source }}
-snmp-server location "{{ graphql_data.location.name if snmp.use_device_location else snmp.location | default('') }}"
+snmp-server location "{{ obj.location.name if snmp.use_device_location else snmp.location | default('') }}"
 snmp-server contact "{{ snmp.contact }}"
 
 {# SNMP Traps #}
@@ -15,5 +15,5 @@ snmp-server enable traps {{ trap }}
 
 {# SNMP Hosts #}
 {% for host in snmp.hosts %}
-snmp-server host {{ host.ip }} {{ secret(host.secret_key) }}
+snmp-server host {{ host.ip }} {{ host.secret_key }}
 {% endfor %}
