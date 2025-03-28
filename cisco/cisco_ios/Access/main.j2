@@ -13,7 +13,7 @@ snmp-server community {{ community.name }} {{ community.permission }} {{ communi
 {% endfor %}
 
 snmp-server trap-source {{ snmp.trap_source }}
-snmp-server location "{{ snmp.location }}"
+snmp-server location "{{ obj.location }}"
 snmp-server contact "{{ snmp.contact }}"
 
 {# Loop through the enabled traps #}
