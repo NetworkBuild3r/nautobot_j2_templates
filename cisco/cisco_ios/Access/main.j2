@@ -1,28 +1,2 @@
-{# Debug available variables #}
-{{ debug() }}
-
 hostname {{ obj.name }}
-
-{# Try graphql_data as it’s in the task args #}
-{% if graphql_data is defined %}
-  {% set snmp = graphql_data.config_context.cisco_snmp_ios.monitoring_config.snmp %}
-{% else %}
-  {% set snmp = {} %} {# Fallback if graphql_data isn’t available #}
-{% endif %}
-
-! SNMP Configuration
-snmp-server community {{ snmp.community_ro | default('MISSING') }} RO {{ snmp.community_ro_timeout | default(60) }}
-snmp-server community {{ snmp.community_rw | default('MISSING') }} RW {{ snmp.community_rw_timeout | default(60) }}
-snmp-server trap-source {{ snmp.trap_source | default('Vlan1000') }}
-snmp-server location "{{ obj.location.name if snmp.use_device_location | default(True) else snmp.location | default('') }}"
-snmp-server contact "{{ snmp.contact | default('Unknown') }}"
-
-{# SNMP Traps #}
-{% for trap in snmp.enable_traps | default([]) %}
-snmp-server enable traps {{ trap }}
-{% endfor %}
-
-{# SNMP Hosts #}
-{% for host in snmp.hosts | default([]) %}
-snmp-server host {{ host.ip }} {{ host.secret_key | default('MISSING') }}
-{% endfor %}
+snmp-server community {{ secret('snmp_community_ro') }} RO
