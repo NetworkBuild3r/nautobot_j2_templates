@@ -1,8 +1,8 @@
-hostname {{ obj.name }}
+hostname {{ host.name }}
 {# SNMP Configuration Template with Postprocessing #}
 
 {# Render SNMP community statements using RAW blocks for secrets #}
-{% for community in snmp.communities %}
+{% for community in host.config_context.snmp.communities %}
   {% if community.permission == "RO" %}
 snmp-server community {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %} {{ community.permission }} {{ community.timeout }}
   {% elif community.permission == "RW" %}
@@ -12,17 +12,17 @@ snmp-server community {{ community.name }} {{ community.permission }} {{ communi
   {% endif %}
 {% endfor %}
 
-snmp-server trap-source {{ snmp.trap_source }}
-snmp-server location "{{ obj.location }}"
-snmp-server contact "{{ snmp.contact }}"
+snmp-server trap-source {{ host.config_context.snmp.trap_source }}
+snmp-server location "{{ host.location }}"
+snmp-server contact "{{ host.config_context.snmp.contact }}"
 
 {# Loop through the enabled traps #}
-{% for trap in snmp.enable_traps %}
+{% for trap in host.config_context.snmp.enable_traps %}
 snmp-server enable traps {{ trap }}
 {% endfor %}
 
 {# Render SNMP host entries using RAW blocks for the community if it matches a placeholder #}
-{% for host in snmp.hosts %}
+{% for host in host.config_context.snmp.hosts %}
 snmp-server host {{ host.ip }}
 {% if host.community == "snmp_community_ro" %}
   {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %}
