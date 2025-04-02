@@ -2,11 +2,11 @@ hostname {{ host.name }}
 
 ! SNMP Community Strings:
 {% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}
-snmp-server community {% if comm['name'].startswith("secret_") %}
+snmp-server community {% if comm['name'].startswith("secret_") -%}
     {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name(comm['name'][7:]) | default("MISSING") }}{% endraw %}
-{% else %}
+{%- else -%}
     {{ comm['name'] }}
-{% endif %} {{ comm['permission'] }} {{ comm['timeout'] }}
+{%- endif %} {{ comm['permission'] }} {{ comm['timeout'] }}
 {% endfor %}
 
 ! SNMP Trap Source, Contact, and Location:
@@ -36,9 +36,9 @@ snmp-server enable traps {{ trap }}
 
 ! SNMP Host Entries with Secret Lookups:
 {% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] %}
-snmp-server host {{ entry['ip'] }}     {% if entry['community'].startswith("secret_") %}
+snmp-server host {{ entry['ip'] }}    {% if entry['community'].startswith("secret_") -%}
     {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name(entry['community'][7:]) | default("MISSING") }}{% endraw %}
-{% else %}
+{%- else -%}
     {{ entry['community'] }}
-{% endif %}
+{%- endif %}
 {% endfor %}
