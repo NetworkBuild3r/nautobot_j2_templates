@@ -1,34 +1,40 @@
 hostname {{ host.name }}
-{# SNMP Configuration Template with Postprocessing #}
 
-{# Render SNMP community statements using RAW blocks for secrets #}
-{% for community in host.config_context.snmp.communities %}
-  {% if community.permission == "RO" %}
-snmp-server community {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %} {{ community.permission }} {{ community.timeout }}
-  {% elif community.permission == "RW" %}
-snmp-server community {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name("snmp_community_rw") | default("MISSING") }}{% endraw %} {{ community.permission }} {{ community.timeout }}
-  {% else %}
-snmp-server community {{ community.name }} {{ community.permission }} {{ community.timeout }}
-  {% endif %}
+! SNMP Configuration
+
+{% set snmp = host.config_context['cisco_snmp_ios']['snmp'] %}
+
+! Community Strings:
+{% for comm in snmp['communities'] %}
+snmp-server community {{ comm['name'] }} {{ comm['permission'] }} {{ comm['timeout'] }}
 {% endfor %}
 
-snmp-server trap-source {{ host.config_context.snmp.trap_source }}
+! Trap Source, Contact, and Location:
+snmp-server trap-source {{ snmp['trap_source'] }}
+snmp-server contact "{{ snmp['contact'] }}"
 snmp-server location "{{ host.location }}"
-snmp-server contact "{{ host.config_context.snmp.contact }}"
 
-{# Loop through the enabled traps #}
-{% for trap in host.config_context.snmp.enable_traps %}
+! Access Control Lists:
+{% if snmp['acl_51'] %}
+ip access-list standard 51
+{% for acl in snmp['acl_51'] %}
+  {{ acl }}
+{% endfor %}
+{% endif %}
+
+{% if snmp['acl_60'] %}
+ip access-list standard 60
+{% for acl in snmp['acl_60'] %}
+  {{ acl }}
+{% endfor %}
+{% endif %}
+
+! Enabled SNMP Traps:
+{% for trap in snmp['enable_traps'] %}
 snmp-server enable traps {{ trap }}
 {% endfor %}
 
-{# Render SNMP host entries using RAW blocks for the community if it matches a placeholder #}
-{% for host in host.config_context.snmp.hosts %}
-snmp-server host {{ host.ip }}
-{% if host.community == "snmp_community_ro" %}
-  {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %}
-{% elif host.community == "snmp_community_rw" %}
-  {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name("snmp_community_rw") | default("MISSING") }}{% endraw %}
-{% else %}
-  {{ host.community }}
-{% endif %}
+! SNMP Host Entries:
+{% for entry in snmp['hosts'] %}
+snmp-server host {{ entry['ip'] }} {{ entry['community'] }}
 {% endfor %}
