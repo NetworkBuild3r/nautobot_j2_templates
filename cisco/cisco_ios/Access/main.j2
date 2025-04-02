@@ -1,15 +1,15 @@
 hostname {{ host.name }}
-
-! SNMP Configuration
+{# SNMP Configuration Template with Secret Lookups #}
 
 {% set snmp = host.config_context['cisco_snmp_ios']['snmp'] %}
 
-! Community Strings:
+! SNMP Community Strings:
+{# You can choose to output communities directly or use secrets for other parts – here we output the communities section normally #}
 {% for comm in snmp['communities'] %}
 snmp-server community {{ comm['name'] }} {{ comm['permission'] }} {{ comm['timeout'] }}
 {% endfor %}
 
-! Trap Source, Contact, and Location:
+! SNMP Trap Source, Contact, and Location:
 snmp-server trap-source {{ snmp['trap_source'] }}
 snmp-server contact "{{ snmp['contact'] }}"
 snmp-server location "{{ host.location }}"
@@ -34,7 +34,14 @@ ip access-list standard 60
 snmp-server enable traps {{ trap }}
 {% endfor %}
 
-! SNMP Host Entries:
+! SNMP Host Entries with Secret Lookups:
 {% for entry in snmp['hosts'] %}
-snmp-server host {{ entry['ip'] }} {{ entry['community'] }}
+snmp-server host {{ entry['ip'] }}
+{% if entry['community'] == "snmp_community_ro_placeholder" %}
+  {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name("snmp_community_ro") | default("MISSING") }}{% endraw %}
+{% elif entry['community'] == "snmp_community_rw_placeholder" %}
+  {% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name("snmp_community_rw") | default("MISSING") }}{% endraw %}
+{% else %}
+  {{ entry['community'] }}
+{% endif %}
 {% endfor %}
