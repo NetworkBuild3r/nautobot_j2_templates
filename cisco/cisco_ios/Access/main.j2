@@ -35,6 +35,7 @@ snmp-server enable traps {{ trap }}
 {% endfor %}
 
 ! SNMP Host Entries with Secret Lookups:
-{% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] %}
+{% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] -%}
+DEBUG: {{ entry['ip'] }}
 snmp-server host {{ entry['ip'] }} {% if entry['community'].startswith("secret_") %}{% raw %}{{ (secrets_group or {}).get("name", "") | get_secret_by_secret_group_name(entry['community'][7:]) | default("MISSING") }}{% endraw %}{% else %}{{ entry['community'] }}{% endif %}
 {% endfor %}
