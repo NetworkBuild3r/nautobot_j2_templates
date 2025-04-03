@@ -1,0 +1,23 @@
+! AAA Configuration
+aaa new-model
+
+! AAA Authentication
+aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
+aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
+aaa authentication enable default {{ host.config_context.aaa.authentication.enable }}
+aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
+
+! AAA Authorization
+aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}
+aaa authorization network default {{ host.config_context.aaa.authorization.network }}
+
+! AAA Accounting
+aaa accounting exec vty start-stop {{ host.config_context.aaa.accounting.exec }}
+aaa accounting commands 0 vty start-stop {{ host.config_context.aaa.accounting.commands["0"] }}
+aaa accounting commands 15 vty start-stop {{ host.config_context.aaa.accounting.commands["15"] }}
+
+! Example Sensitive Section (e.g., TACACS+ keys)
+! These are rendered at deployment via Nautobot Secrets.
+tacacs server SCA-ISE-PSN01
+ address ipv4 10.9.64.14
+ key {% raw %}{{ secrets_group["Device-Creds"] | get_secret_by_secret_group_name("tacacs_key_1") }}{% endraw %}
