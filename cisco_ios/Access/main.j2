@@ -3,9 +3,4 @@ hostname {{ host.name }}
 
 ! Include common configurations
 {% include '../common/ios_snmp.j2' ignore missing %}
-{#{% include 'common/aaa.j2' ignore missing %}#}
-{#{% include 'common/ntp.j2' ignore missing %}#}
-{#{% include 'common/syslog.j2' ignore missing %}#}
 
-! Debug: Check if templates are found
-! SNMP: {{ lookup('template', '../../common/ios_snmp.j2') | default('SNMP template not found') }}
