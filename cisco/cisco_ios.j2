@@ -3,4 +3,6 @@
 
 ! Include common configurations
 {% include './common/ios_snmp.j2' %}
-
+{% include './common/aaa.j2' ignore missing %}
+{% include './common/ntp.j2' ignore missing %}
+{% include './common/syslog.j2' ignore missing %}
