@@ -1,7 +1,9 @@
-! SNMP Community Strings:
-{% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}
-snmp-server community {% if comm['name'].startswith("secret_") %}{% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name(comm['name'][7:]) }}{% endraw %}{% else %}{{ comm['name'] }}{% endif %} {{ comm['permission'] }} {{ comm['timeout'] }}
-{% endfor %}
+hostname {{ host.name }}
+
+{#! SNMP Community Strings:#}
+{#{% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}#}
+{#snmp-server community {% if comm['name'].startswith("secret_") %}{% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name(comm['name'][7:]) }}{% endraw %}{% else %}{{ comm['name'] }}{% endif %} {{ comm['permission'] }} {{ comm['timeout'] }}#}
+{#{% endfor %}#}
 
 {#! SNMP Trap Source, Contact, and Location:#}
 {#snmp-server trap-source {{ host.config_context['cisco_snmp_ios']['snmp']['trap_source'] }}#}
