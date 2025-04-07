@@ -1,5 +1,5 @@
 hostname {{ host.name }}
-
+! SNMP
 {#! SNMP Community Strings:#}
 {#{% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}#}
 {#snmp-server community {% if comm['name'].startswith("secret_") %}{% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name(comm['name'][7:]) }}{% endraw %}{% else %}{{ comm['name'] }}{% endif %} {{ comm['permission'] }} {{ comm['timeout'] }}#}
