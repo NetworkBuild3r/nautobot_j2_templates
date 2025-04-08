@@ -1,23 +1,29 @@
 ! Interfaces
 {% for interface in host.interfaces %}
 interface {{ interface.name }}
- description {{ interface.description | default('No description') }}
- {% if interface.ip_addresses %}
+{% if interface.description %}
+ description {{ interface.description }}
+{% endif %}
+{% if interface.ip_addresses %}
  {% set prefix = interface.ip_addresses[0].address.split('/')[1] | int %}
  ip address {{ interface.ip_addresses[0].address.split('/')[0] }} {{ prefix | cidr_to_netmask }}
- {% endif %}
- {% if 'vrf' in interface and interface.vrf %}
+{% endif %}
+{% if 'vrf' in interface and interface.vrf %}
  vrf forwarding {{ interface.vrf.name }}
+{% endif %}
+{% if interface.tagged_vlans or interface.untagged_vlan %}
+ {% if interface.tagged_vlans %}
+ switchport mode trunk
+ switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
  {% endif %}
- {% if interface.tagged_vlans or interface.untagged_vlan %}
-  {% if interface.tagged_vlans %}
-  switchport mode trunk
-  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
-  {% endif %}
-  {% if interface.untagged_vlan %}
-  switchport mode access
-  switchport access vlan {{ interface.untagged_vlan.vid }}
-  {% endif %}
+ {% if interface.untagged_vlan %}
+ switchport mode access
+ switchport access vlan {{ interface.untagged_vlan.vid }}
  {% endif %}
- shutdown {{ 'no' if interface.enabled else '' }}
+{% endif %}
+{% if interface.enabled %}
+ no shutdown
+{% else %}
+ shutdown
+{% endif %}
 {% endfor %}
