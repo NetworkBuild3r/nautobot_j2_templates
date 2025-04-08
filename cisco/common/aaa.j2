@@ -12,7 +12,9 @@ aaa authorization network default {{ host.config_context.aaa.authorization.netwo
 aaa accounting exec vty start-stop {{ host.config_context.aaa.accounting.exec }}
 aaa accounting commands 0 vty start-stop {{ host.config_context.aaa.accounting.commands["0"] }}
 aaa accounting commands 15 vty start-stop {{ host.config_context.aaa.accounting.commands["15"] }}
-! TACACS+ Server
-tacacs server SCA-ISE-PSN01
- address ipv4 10.9.64.14
- key {% raw %}{{ secrets_group["Device-Creds"] | get_secret_by_secret_group_name("tacacs_key_1") }}{% endraw %}
+! TACACS+ Servers
+{% for tac in host.config_context.tacacs_servers %}
+tacacs server {{ tac.name }}
+ address ipv4 {{ tac.ip_address }}
+ key {% raw %}{{ secrets_group["Device-Creds"] | get_secret_by_secret_group_name(tac.key) }}{% endraw %}
+{% endfor %}
