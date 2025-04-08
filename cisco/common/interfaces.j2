@@ -1,5 +1,5 @@
 ! Interfaces
-{% for interface in host.interfaces -%}
+{% for interface in host.interfaces %}
 interface {{ interface.name }}
 {%- if interface.description %}
  description {{ interface.description }}
@@ -15,16 +15,16 @@ interface {{ interface.name }}
  {%- if interface.tagged_vlans %}
  switchport mode trunk
  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
- {%- endif %}
+ {%- endif -%}
  {%- if interface.untagged_vlan %}
  switchport mode access
  switchport access vlan {{ interface.untagged_vlan.vid }}
- {%- endif %}
-{%- endif %}
+ {%- endif -%}
+{%- endif -%}
 {%- if interface.enabled %}
  no shutdown
 {%- else %}
  shutdown
 {%- endif %}
 
-{%- endfor %}
+{% endfor %}
