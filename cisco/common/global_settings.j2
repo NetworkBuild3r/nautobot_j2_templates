@@ -2,4 +2,6 @@
 service timestamps debug datetime msec
 service timestamps log datetime msec
 service password-encryption
-{{ host.config_context.global_settings | default('') }}
+{% if 'global_settings' in device.config_context %}
+{{ device.config_context.global_settings }}
+{% endif %}

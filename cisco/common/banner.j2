@@ -1,3 +1,9 @@
+{% if 'banner' in device.config_context %}
 banner login ^C
-{{ host.config_context.banner | default('Authorized Access Only') }}
+{{ device.config_context.banner }}
 ^C
+{% else %}
+banner login ^C
+Authorized Access Only
+^C
+{% endif %}

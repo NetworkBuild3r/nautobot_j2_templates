@@ -1,6 +1,14 @@
-{% for acl in host.config_context.access_lists | default([]) %}
-ip access-list standard {{ acl.name }}
- {% for rule in acl.rules %}
+{% if 'cisco_snmp_ios' in device.config_context and 'snmp' in device.config_context.cisco_snmp_ios %}
+ {% if 'acl_51' in device.config_context.cisco_snmp_ios.snmp %}
+ip access-list standard 51
+ {% for rule in device.config_context.cisco_snmp_ios.snmp.acl_51 %}
  {{ rule }}
  {% endfor %}
-{% endfor %}
+ {% endif %}
+ {% if 'acl_60' in device.config_context.cisco_snmp_ios.snmp %}
+ip access-list standard 60
+ {% for rule in device.config_context.cisco_snmp_ios.snmp.acl_60 %}
+ {{ rule }}
+ {% endfor %}
+ {% endif %}
+{% endif %}

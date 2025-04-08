@@ -1,4 +1,4 @@
 ! NTP Configuration
-{% for server in host.config_context.ntp.servers %}
+{% for server in device.config_context.ntp.servers %}
 ntp server {{ server }}
 {% endfor %}
