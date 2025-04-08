@@ -9,20 +9,15 @@ snmp-server trap-source {{ host.config_context['cisco_snmp_ios']['snmp']['trap_s
 snmp-server contact "{{ host.config_context['cisco_snmp_ios']['snmp']['contact'] }}"
 snmp-server location "{{ host.location['name'] if host.location is mapping else host.location }}"
 
-! ACLs:
-{% if 'acl_51' in host.config_context['cisco_snmp_ios']['snmp'] %}
-ip access-list standard 51
- {% for acl in host.config_context['cisco_snmp_ios']['snmp']['acl_51'] %}
- {{ acl }}
- {% endfor %}
-{% endif %}
-
-{% if 'acl_60' in host.config_context['cisco_snmp_ios']['snmp'] %}
-ip access-list standard 60
- {% for acl in host.config_context['cisco_snmp_ios']['snmp']['acl_60'] %}
- {{ acl }}
- {% endfor %}
-{% endif %}
+{% for acl_number in ['51', '60'] %}
+  {% set acl_key = 'acl_' ~ acl_number %}
+  {% if acl_key in host.config_context['cisco_snmp_ios']['snmp'] %}
+ip access-list standard {{ acl_number }}
+  {% for rule in host.config_context['cisco_snmp_ios']['snmp'][acl_key] %}
+    {{ rule }}
+  {% endfor %}
+  {% endif %}
+{% endfor %}
 
 ! Enabled SNMP Traps:
 {% for trap in host.config_context['cisco_snmp_ios']['snmp']['enable_traps'] %}
