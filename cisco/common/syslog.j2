@@ -1,3 +1,6 @@
-! Syslog Configuration
-logging source-interface {{ host.config_context.syslog.source_interface }}
-logging host {{ host.config_context.syslog.logging_host }}
+# Template file: logging_config.j2
+{% if 'logging' in host.config_context and 'console' in host.config_context.logging %}
+logging console {{ host.config_context.logging.console }}
+{% else %}
+logging console informational
+{% endif %}
