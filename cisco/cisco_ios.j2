@@ -1,8 +1,17 @@
-{# ./cisco_ios/Access/main.j2 #}
 
-
-! Include common configurations
-{% include './common/ios_snmp.j2' %}
-{% include './common/aaa.j2' ignore missing %}
-{% include './common/ntp.j2' ignore missing %}
-{% include './common/syslog.j2' ignore missing %}
+{% include './common/global_settings.j2' ignore missing -%}
+{% include './common/hostname.j2' ignore missing -%}
+{% include './common/vrfs.j2' ignore missing -%}
+{% include './common/logging_config.j2' ignore missing -%}
+{% include './common/enable_secret.j2' ignore missing -%}
+{% include './common/crypto.j2' ignore missing -%}
+{% include './common/policy_maps.j2' ignore missing -%}
+{% include './common/interfaces.j2' ignore missing -%}
+{% include './common/access_lists.j2' ignore missing -%}
+{% include './common/banner.j2' ignore missing -%}
+{% include './common/line_configs.j2' ignore missing -%}
+{% include './common/call_home.j2' ignore missing -%}
+{% include './common/aaa.j2' ignore missing -%}
+{% include './common/ios_snmp.j2' ignore missing -%}
+{% include './common/ntp.j2' ignore missing -%}
+{% include './common/syslog.j2' ignore missing -%}

@@ -1,0 +1,24 @@
+! Interfaces
+{% for interface in host.interfaces %}
+interface {{ interface.name }}
+ description {{ interface.description | default('No description') }}
+ {% if interface.ip_addresses %}
+ ip address {{ interface.ip_addresses[0].address.split('/')[0] }} {{ interface.ip_addresses[0].address | netmask_from_prefix }}
+ {% endif %}
+ {% if interface.vrf %}
+ vrf forwarding {{ interface.vrf.name }}
+ {% endif %}
+ {% if interface.switchport_mode %}
+ switchport mode {{ interface.switchport_mode }}
+ {% endif %}
+ {% if interface.switchport_access_vlan %}
+ switchport access vlan {{ interface.switchport_access_vlan }}
+ {% endif %}
+ {% if interface.switchport_trunk_native_vlan %}
+ switchport trunk native vlan {{ interface.switchport_trunk_native_vlan }}
+ {% endif %}
+ {% if interface.switchport_trunk_allowed_vlans %}
+ switchport trunk allowed vlan {{ interface.switchport_trunk_allowed_vlans }}
+ {% endif %}
+ shutdown {{ 'no' if interface.enabled else '' }}
+{% endfor %}

@@ -1,0 +1,7 @@
+{% for vrf in host.config_context.vrfs | default([]) %}
+vrf definition {{ vrf.name }}
+ address-family ipv4
+ exit-address-family
+ address-family ipv6
+ exit-address-family
+{% endfor %}

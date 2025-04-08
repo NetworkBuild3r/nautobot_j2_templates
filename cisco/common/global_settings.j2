@@ -1,0 +1,5 @@
+! Global Settings
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+{{ host.config_context.global_settings | default('') }}

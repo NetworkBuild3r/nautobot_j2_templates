@@ -1,0 +1,4 @@
+line con 0
+ {{ host.config_context.line_configs.console | default('exec-timeout 15 0') }}
+line vty 0 4
+ {{ host.config_context.line_configs.vty | default('transport input ssh') }}

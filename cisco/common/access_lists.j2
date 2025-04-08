@@ -1,0 +1,6 @@
+{% for acl in host.config_context.access_lists | default([]) %}
+ip access-list standard {{ acl.name }}
+ {% for rule in acl.rules %}
+ {{ rule }}
+ {% endfor %}
+{% endfor %}
