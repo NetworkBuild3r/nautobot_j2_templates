@@ -1,5 +1,5 @@
 ! Interfaces
-{% for interface in device.interfaces %}
+{% for interface in host.interfaces %}
 interface {{ interface.name }}
  description {{ interface.description | default('No description') }}
  {% if interface.ip_addresses %}

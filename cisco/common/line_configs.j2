@@ -1,8 +1,8 @@
-{% if 'line_configs' in device.config_context %}
+{% if 'line_configs' in host.config_context %}
 line con 0
- {{ device.config_context.line_configs.console }}
+ {{ host.config_context.line_configs.console }}
 line vty 0 4
- {{ device.config_context.line_configs.vty }}
+ {{ host.config_context.line_configs.vty }}
 {% else %}
 line con 0
  exec-timeout 15 0

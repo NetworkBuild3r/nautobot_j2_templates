@@ -1,6 +1,6 @@
-{% if 'banner' in device.config_context %}
+{% if 'banner' in host.config_context %}
 banner login ^C
-{{ device.config_context.banner }}
+{{ host.config_context.banner }}
 ^C
 {% else %}
 banner login ^C
