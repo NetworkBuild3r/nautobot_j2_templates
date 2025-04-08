@@ -3,7 +3,7 @@
 interface {{ interface.name }}
  description {{ interface.description | default('No description') }}
  {% if interface.ip_addresses %}
- ip address {{ interface.ip_addresses[0].address.split('/')[0] }} {{ interface.ip_addresses[0].address | cidr_to_netmask }}
+ ip address {{ interface.ip_addresses[0].address.split('/')[0] }} {{ interface.ip_addresses[0].address.split('/')[1] | cidr_to_netmask }}
  {% endif %}
  {% if interface.vrf %}
  vrf forwarding {{ interface.vrf.name }}
