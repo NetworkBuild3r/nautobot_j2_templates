@@ -1,5 +1,5 @@
-{% if 'logging' in device.config_context and 'console' in device.config_context.logging %}
-logging console {{ device.config_context.logging.console }}
+{% if 'logging' in host.config_context and 'console' in host.config_context.logging %}
+logging console {{ host.config_context.logging.console }}
 {% else %}
 logging console informational
 {% endif %}
