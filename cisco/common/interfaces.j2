@@ -1,31 +1,30 @@
 ! Interfaces
-{% for interface in host.interfaces %}
+{% for interface in host.interfaces -%}
 interface {{ interface.name }}
-{% set commands = [] %}
-{% if interface.description %}
- {% do commands.append(' description ' + interface.description) %}
-{% endif %}
-{% if interface.ip_addresses %}
+{%- if interface.description %}
+ description {{ interface.description }}
+{%- endif -%}
+{%- if interface.ip_addresses %}
  {% set prefix = interface.ip_addresses[0].address.split('/')[1] | int %}
- {% do commands.append(' ip address ' + interface.ip_addresses[0].address.split('/')[0] + ' ' + (prefix | cidr_to_netmask)) %}
-{% endif %}
-{% if 'vrf' in interface and interface.vrf %}
- {% do commands.append(' vrf forwarding ' + interface.vrf.name) %}
-{% endif %}
-{% if interface.tagged_vlans or interface.untagged_vlan %}
- {% if interface.tagged_vlans %}
- {% do commands.append(' switchport mode trunk') %}
- {% do commands.append(' switchport trunk allowed vlan ' + (interface.tagged_vlans | map(attribute='vid') | join(','))) %}
- {% endif %}
- {% if interface.untagged_vlan %}
- {% do commands.append(' switchport mode access') %}
- {% do commands.append(' switchport access vlan ' + interface.untagged_vlan.vid) %}
- {% endif %}
-{% endif %}
-{% if interface.enabled %}
- {% do commands.append(' no shutdown') %}
-{% else %}
- {% do commands.append(' shutdown') %}
-{% endif %}
-{{ '\n'.join(commands) }}
-{% endfor %}
+ ip address {{ interface.ip_addresses[0].address.split('/')[0] }} {{ prefix | cidr_to_netmask }}
+{%- endif -%}
+{%- if 'vrf' in interface and interface.vrf %}
+ vrf forwarding {{ interface.vrf.name }}
+{%- endif -%}
+{%- if interface.tagged_vlans or interface.untagged_vlan %}
+ {%- if interface.tagged_vlans %}
+ switchport mode trunk
+ switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
+ {%- endif %}
+ {%- if interface.untagged_vlan %}
+ switchport mode access
+ switchport access vlan {{ interface.untagged_vlan.vid }}
+ {%- endif %}
+{%- endif %}
+{%- if interface.enabled %}
+ no shutdown
+{%- else %}
+ shutdown
+{%- endif %}
+
+{%- endfor %}
