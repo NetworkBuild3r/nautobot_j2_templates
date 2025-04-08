@@ -6,7 +6,7 @@ interface {{ interface.name }}
  {% set prefix = interface.ip_addresses[0].address.split('/')[1] | int %}
  ip address {{ interface.ip_addresses[0].address.split('/')[0] }} {{ prefix | cidr_to_netmask }}
  {% endif %}
- {% if interface.vrf %}
+ {% if 'vrf' in interface and interface.vrf %}
  vrf forwarding {{ interface.vrf.name }}
  {% endif %}
  {% if interface.tagged_vlans or interface.untagged_vlan %}
