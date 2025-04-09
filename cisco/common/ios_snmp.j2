@@ -7,12 +7,23 @@ snmp-server community {% if comm['name'].startswith("secret_") %}{% raw %}{{ sec
 ! SNMP Trap Source, Contact, and Location:
 snmp-server trap-source {{ host.config_context['cisco_snmp_ios']['snmp']['trap_source'] }}
 snmp-server contact "{{ host.config_context['cisco_snmp_ios']['snmp']['contact'] }}"
-snmp-server location "{{ host.location['name'] if host.location is mapping else host.location }}"
 
-{#
-  Note: ACLs (such as ACL 51 and 60) should be rendered in access_lists.j2.
-  Ensure this file is included *after* access_lists.j2 in the main template to avoid missing dependencies.
-#}
+{# Build SNMP location dynamically from location, rack_group, and rack #}
+{% set loc = host.location.name if host.location is mapping else host.location %}
+{% set rack_group = host.rack.rack_group.name if host.rack and host.rack.rack_group else '' %}
+{% set rack_name = host.rack.name if host.rack else '' %}
+snmp-server location {{ loc }}{% if rack_group %} {{ rack_group }}{% endif %}{% if rack_name %} Rack {{ rack_name }}{% endif %}
+
+{# ACLs for SNMP #}
+{% for acl_number in ['51', '60'] %}
+  {% set acl_key = 'acl_' ~ acl_number %}
+  {% if acl_key in host.config_context['cisco_snmp_ios']['snmp'] %}
+ip access-list standard {{ acl_number }}
+  {% for rule in host.config_context['cisco_snmp_ios']['snmp'][acl_key] %}
+    {{ rule }}
+  {% endfor %}
+  {% endif %}
+{% endfor %}
 
 ! Enabled SNMP Traps:
 {% for trap in host.config_context['cisco_snmp_ios']['snmp']['enable_traps'] %}
