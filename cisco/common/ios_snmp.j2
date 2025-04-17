@@ -8,15 +8,14 @@ snmp-server community {% if comm['name'].startswith("secret_") %}{% raw %}{{ sec
 snmp-server trap-source {{ host.config_context['cisco_snmp_ios']['snmp']['trap_source'] }}
 snmp-server contact "{{ host.config_context['cisco_snmp_ios']['snmp']['contact'] }}"
 
-{# Build SNMP location dynamically from location, rack_group, and rack #}
-{% set loc = host.location.name if host.location is mapping else host.location %}
-{% if host.__dict__.get('rack') %}
-    {% set rack_group = host.rack.rack_group.name if host.rack.rack_group is defined and host.rack.rack_group else '' %}
-    {% set rack_name = host.rack.name if host.rack.name is defined and host.rack.name else '' %}
-{% else %}
-    {% set rack_group = '' %}
-    {% set rack_name = '' %}
-{% endif %}
+{#‑‑‑ Build SNMP location dynamically from location, rack‑group, and rack ‑‑‑#}
+{% set rack = host.get('rack') %}              {# safe dict‑style lookup :contentReference[oaicite:0]{index=0} #}
+{% set loc  = host.location.name
+              if host.location is mapping else host.location %}
+
+{% set rack_group = rack.rack_group.name if rack and rack.rack_group else '' %}
+{% set rack_name  = rack.name if rack else '' %}
+
 snmp-server location {{ loc }}{% if rack_group %} {{ rack_group }}{% endif %}{% if rack_name %} Rack {{ rack_name }}{% endif %}
 
 {# ACLs for SNMP #}
