@@ -18,19 +18,19 @@
 {#{% include 'common/cisco/ntp.j2' %}#}
 {#{% include 'common/cisco/syslog.j2' %}#}
 
-! — Access‑only tweaks below —
-
-{% for intf in host.interfaces if intf.untagged_vlan %}
-interface {{ intf.name }}
-  switchport mode access
-  switchport access vlan {{ intf.untagged_vlan.vid }}
-  {% if intf.tagged_vlans %}
-  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}
-  {% endif %}
-  {% if intf.description %}description {{ intf.description }}{% endif %}
-  spanning-tree portfast
-  spanning-tree bpduguard enable
-{% endfor %}
+{#! — Access‑only tweaks below —#}
+{##}
+{#{% for intf in host.interfaces if intf.untagged_vlan %}#}
+{#interface {{ intf.name }}#}
+{#  switchport mode access#}
+{#  switchport access vlan {{ intf.untagged_vlan.vid }}#}
+{#  {% if intf.tagged_vlans %}#}
+{#  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}#}
+{#  {% endif %}#}
+{#  {% if intf.description %}description {{ intf.description }}{% endif %}#}
+{#  spanning-tree portfast#}
+{#  spanning-tree bpduguard enable#}
+{#{% endfor %}#}
 
 ! Management SVI
 interface Vlan{{ host.config_context.mgmt.vlan }}
