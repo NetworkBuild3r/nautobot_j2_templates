@@ -1,6 +1,6 @@
 # File: role/{{ obj.platform.network_driver }}_{{ obj.role.name|lower }}.j2
 {#hostname {{ host.name }}#}
-{% include 'common/cisco/hostname.j2' %}
+{% include 'templates/common/cisco/hostname.j2' %}
 {#{% include 'common/cisco/global_settings.j2' %}#}
 {#{% include 'common/cisco/vrfs.j2' %}#}
 {#{% include 'common/cisco/ios_snmp.j2' %}#}
