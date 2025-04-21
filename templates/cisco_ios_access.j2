@@ -1,7 +1,7 @@
 # File: role/{{ obj.platform.network_driver }}_{{ obj.role.name|lower }}.j2
-hostname {{ host.name }}
-{#{% include './common/cisco/hostname.j2' %}#}
-{#{% include './common/cisco/global_settings.j2' %}#}
+{#hostname {{ host.name }}#}
+{% include './common/cisco/hostname.j2' %}
+{% include './common/cisco/global_settings.j2' %}
 {#{% include './common/cisco/vrfs.j2' %}#}
 {#{% include './common/cisco/ios_snmp.j2' %}#}
 {#{% include './common/cisco/logging_config.j2' %}#}
@@ -31,18 +31,18 @@ hostname {{ host.name }}
 {#  spanning-tree portfast#}
 {#  spanning-tree bpduguard enable#}
 {#{% endfor %}#}
-
-! Management SVI
-interface Vlan{{ host.config_context.mgmt.vlan }}
-  ip address {{ host.config_context.mgmt.ip }} {{ host.config_context.mgmt.mask }}
-  no shutdown
-
-! Uplink Port‑Channel
-interface Port-channel{{ host.config_context.uplink.pc }}
-  description Uplink to {{ host.config_context.uplink.peer }}
-  switchport mode trunk
-  switchport trunk native vlan {{ host.config_context.uplink.native_vlan }}
-{% for member in host.config_context.uplink.members %}
-interface {{ member }}
-  channel-group {{ host.config_context.uplink.pc }} mode active
-{% endfor %}
+{##}
+{#! Management SVI#}
+{#interface Vlan{{ host.config_context.mgmt.vlan }}#}
+{#  ip address {{ host.config_context.mgmt.ip }} {{ host.config_context.mgmt.mask }}#}
+{#  no shutdown#}
+{##}
+{#! Uplink Port‑Channel#}
+{#interface Port-channel{{ host.config_context.uplink.pc }}#}
+{#  description Uplink to {{ host.config_context.uplink.peer }}#}
+{#  switchport mode trunk#}
+{#  switchport trunk native vlan {{ host.config_context.uplink.native_vlan }}#}
+{#{% for member in host.config_context.uplink.members %}#}
+{#interface {{ member }}#}
+{#  channel-group {{ host.config_context.uplink.pc }} mode active#}
+{#{% endfor %}#}
