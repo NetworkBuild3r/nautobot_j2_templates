@@ -1,6 +1,6 @@
-{% if 'banner' in host.config_context %}
-banner login ^C
-{{ host.config_context.banner }}
+{% if host.config_context.data.banner_motd is defined %}
+banner motd ^CCC
+{{ host.config_context.data.banner_motd }}
 ^C
 {% else %}
 banner login ^C
