@@ -1,24 +1,54 @@
 # File: role/{{ obj.platform.network_driver }}_{{ obj.role.name|lower }}.j2
 
+# Hostname and device identity
 {% include 'common/cisco/hostname.j2' %}
+
+# Global settings (service commands, domain name, routing)
 {% include 'common/cisco/global_settings.j2' %}
-{% include 'common/cisco/vrfs.j2' %}
-{% include 'common/cisco/ios_snmp.j2' %}
-{% include 'common/cisco/logging_config.j2' %}
-{% include 'common/cisco/enable_secret.j2' %}
-{% include 'common/cisco/crypto.j2' %}
-{% include 'common/cisco/policy_maps.j2' %}
-{% include 'common/cisco/interfaces.j2' %}
-{% include 'common/cisco/banner.j2' %}
-{% include 'common/cisco/line_configs.j2' %}
+
+# Call-home configuration (optional, uncomment if needed)
 {#{% include 'common/cisco/call_home.j2' %}#}
+
+# VRF definitions (before interfaces)
+{% include 'common/cisco/vrfs.j2' %}
+
+# SNMP configuration for monitoring
+{% include 'common/cisco/ios_snmp.j2' %}
+
+# Console logging configuration
+{% include 'common/cisco/logging_config.j2' %}
+
+# Enable secret for privileged access
+{% include 'common/cisco/enable_secret.j2' %}
+
+# Crypto and SSH settings
+{% include 'common/cisco/crypto.j2' %}
+
+# Policy maps for QoS (before interfaces)
+{% include 'common/cisco/policy_maps.j2' %}
+
+# Interface configurations
+{% include 'common/cisco/interfaces.j2' %}
+
+# Banner for login/MOTD
+{% include 'common/cisco/banner.j2' %}
+
+# AAA configuration (including TACACS+ servers, before line configs)
 {% include 'common/cisco/aaa.j2' %}
+
+# Line configurations (console and VTY)
+{% include 'common/cisco/line_configs.j2' %}
+
+# NTP for time synchronization
 {% include 'common/cisco/ntp.j2' %}
+
+# Syslog for centralized logging
 {% include 'common/cisco/syslog.j2' %}
 
-{##}
-{#! — Access‑only tweaks below —#}
-{##}
+{# Access-lists can be enabled if needed #}
+{# {% include 'common/cisco/access_lists.j2' %} #}
+
+{# Access-only tweaks below #}
 {#{% for intf in host.interfaces if intf.untagged_vlan %}#}
 {#interface {{ intf.name }}#}
 {#  switchport mode access#}
@@ -30,13 +60,13 @@
 {#  spanning-tree portfast#}
 {#  spanning-tree bpduguard enable#}
 {#{% endfor %}#}
-{##}
-{#! Management SVI#}
+
+{# Management SVI #}
 {#interface Vlan{{ host.config_context.mgmt.vlan }}#}
 {#  ip address {{ host.config_context.mgmt.ip }} {{ host.config_context.mgmt.mask }}#}
 {#  no shutdown#}
-{##}
-{#! Uplink Port‑Channel#}
+
+{# Uplink Port-Channel #}
 {#interface Port-channel{{ host.config_context.uplink.pc }}#}
 {#  description Uplink to {{ host.config_context.uplink.peer }}#}
 {#  switchport mode trunk#}
