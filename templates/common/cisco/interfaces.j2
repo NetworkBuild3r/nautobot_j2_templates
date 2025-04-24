@@ -3,9 +3,9 @@ interface {{ interface.name }}
   {%- if interface.description %} description {{ interface.description }}{% endif %}
 
   {%- if interface.ip_addresses %}
-    {% for addr in interface.ip_addresses | map(attribute='address') %}
+    {%- for addr in interface.ip_addresses | map(attribute='address') %}
   ip address {{ addr.split('/')[0] }} {{ addr.split('/')[1] | int | cidr_to_netmask }}
-    {% endfor %}
+    {%- endfor %}
   {% endif %}
 
   {%- if interface.vrf %}
@@ -17,8 +17,8 @@ interface {{ interface.name }}
   switchport mode trunk
   switchport trunk allowed vlan {{
     interface.tagged_vlans
-      | map('attr', 'vid')
-      | map('default', interface.tagged_vlans[loop.index0].id)
+      | map(attribute='vid')
+      | default([])         # in case tagged_vlans is empty or vid missing
       | join(',')
   }}
   {% endif %}
@@ -26,7 +26,9 @@ interface {{ interface.name }}
   {#— Access if there’s an untagged VLAN —#}
   {% if interface.untagged_vlan %}
   switchport mode access
-  switchport access vlan {{ interface.untagged_vlan.vid or interface.untagged_vlan.id }}
+  switchport access vlan {{
+    interface.untagged_vlan.vid or interface.untagged_vlan.id
+  }}
     {%- if interface.untagged_vlan.name %}
   ! VLAN name: {{ interface.untagged_vlan.name }}
     {% endif %}
