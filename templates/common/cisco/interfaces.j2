@@ -12,23 +12,26 @@ interface {{ interface.name }}
   vrf forwarding {{ interface.vrf.name }}
   {% endif %}
 
-  {%- if interface.tagged_vlans %}
+  {#— Trunk if any tagged VLANs —#}
+  {% if interface.tagged_vlans %}
   switchport mode trunk
-  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
+  switchport trunk allowed vlan {{
+    interface.tagged_vlans
+      | map('attr', 'vid')
+      | map('default', interface.tagged_vlans[loop.index0].id)
+      | join(',')
+  }}
   {% endif %}
 
-  {%- if interface.untagged_vlan %}
+  {#— Access if there’s an untagged VLAN —#}
+  {% if interface.untagged_vlan %}
   switchport mode access
-  switchport access vlan {{ interface.untagged_vlan.vid }}
+  switchport access vlan {{ interface.untagged_vlan.vid or interface.untagged_vlan.id }}
     {%- if interface.untagged_vlan.name %}
   ! VLAN name: {{ interface.untagged_vlan.name }}
     {% endif %}
   {% endif %}
 
-  {%- if interface.enabled %}
-  no shutdown
-  {%- else %}
-  shutdown
-  {% endif %}
+  {%- if interface.enabled %} no shutdown{% else %} shutdown{% endif %}
 
 {% endfor %}
