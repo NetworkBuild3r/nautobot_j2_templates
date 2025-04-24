@@ -1,5 +1,3 @@
-# File: role/{{ obj.platform.network_driver }}_{{ obj.role.name|lower }}.j2
-
 {# Hostname and device identity #}
 {% include 'common/cisco/hostname.j2' %}
 
@@ -12,14 +10,8 @@
 {# SNMP configuration for monitoring #}
 {% include 'common/cisco/ios_snmp.j2' %}
 
-{# Enable secret for privileged access #}
-{# {% include 'common/cisco/enable_secret.j2' %} #}
-
-{# Crypto and SSH settings #}
-{# {% include 'common/cisco/crypto.j2' %} #}
-
 {# Policy maps for QoS (before interfaces) #}
-{# {% include 'common/cisco/policy_maps.j2' %} #}
+ {% include 'common/cisco/policy_maps.j2' %}
 
 {# Interface configurations #}
 {# {% include 'common/cisco/interfaces.j2' %} #}
