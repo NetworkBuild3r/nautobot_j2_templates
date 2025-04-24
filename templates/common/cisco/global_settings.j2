@@ -1,4 +1,18 @@
-! Global Settings
+{# common/cisco/global_config.j2 #}
+{# Console logging configuration #}
+{% include 'common/cisco/logging_config.j2' %}
+
+{# Enable secret for privileged access #}
+{% if 'enable_secret' in host.config_context %}
+enable secret {{ host.config_context.enable_secret }}
+{% else %}
+enable secret {{ secrets_group["Device-Creds"] | get_secret_by_secret_group_name("enable_secret") }}
+{% endif %}
+
+{# Crypto and SSH settings #}
+{% include 'common/cisco/crypto.j2' %}
+
+{# ! Global Settings #}
 service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
@@ -6,3 +20,6 @@ service call-home
 {% if 'global_settings' in host.config_context %}
 {{ host.config_context.global_settings }}
 {% endif %}
+
+{# -- in your device template, replace all the sections above with: -- #}
+{% raw %}{% include 'common/cisco/global_config.j2' %}{% endraw %}
