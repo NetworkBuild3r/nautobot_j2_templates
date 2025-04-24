@@ -1,39 +1,31 @@
-{% for interface in host.interfaces %}
-interface {{ interface.name }}
-  {%- if interface.description %} description {{ interface.description }}{% endif %}
+{# common/cisco/interfaces.j2 #}
+{% for iface in host.interfaces %}
+interface {{ iface.name }}
+{%   if iface.description %} description {{ iface.description }}{% endif %}
 
-  {%- if interface.ip_addresses %}
-    {%- for addr in interface.ip_addresses | map(attribute='address') %}
-  ip address {{ addr.split('/')[0] }} {{ addr.split('/')[1] | int | cidr_to_netmask }}
-    {%- endfor %}
-  {% endif %}
+{%   if iface.ip_addresses %}
+{%     for ip in iface.ip_addresses | map(attribute='address') %}
+  ip address {{ ip.split('/')[0] }} {{ ip.split('/')[1] | int | cidr_to_netmask }}
+{%     endfor %}
+{%   endif %}
 
-  {%- if interface.vrf %}
-  vrf forwarding {{ interface.vrf.name }}
-  {% endif %}
+{%   if iface.vrf %} vrf forwarding {{ iface.vrf.name }}{% endif %}
 
-  {#— Trunk if any tagged VLANs —#}
-  {% if interface.tagged_vlans %}
+{# ------- L2 configuration ------------------------------------ #}
+{%   if iface.tagged_vlans %}
   switchport mode trunk
   switchport trunk allowed vlan {{
-    interface.tagged_vlans
-      | map(attribute='vid')
-      | default([])         # in case tagged_vlans is empty or vid missing
-      | join(',')
+        iface.tagged_vlans
+        | map(attribute='vid')
+        | select
+        | list
+        | join(',')
   }}
-  {% endif %}
-
-  {#— Access if there’s an untagged VLAN —#}
-  {% if interface.untagged_vlan %}
+{%   elif iface.untagged_vlan %}
   switchport mode access
-  switchport access vlan {{
-    interface.untagged_vlan.vid or interface.untagged_vlan.id
-  }}
-    {%- if interface.untagged_vlan.name %}
-  ! VLAN name: {{ interface.untagged_vlan.name }}
-    {% endif %}
-  {% endif %}
+  switchport access vlan {{ iface.untagged_vlan.vid }}
+{%   endif %}
 
-  {%- if interface.enabled %} no shutdown{% else %} shutdown{% endif %}
+{%   if iface.enabled %} no shutdown{% else %} shutdown{% endif %}
 
 {% endfor %}
