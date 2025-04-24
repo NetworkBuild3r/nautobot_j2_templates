@@ -1,48 +1,45 @@
 # File: role/{{ obj.platform.network_driver }}_{{ obj.role.name|lower }}.j2
 
-# Hostname and device identity
+{# Hostname and device identity #}
 {% include 'common/cisco/hostname.j2' %}
 
-# Global settings (service commands, domain name, routing)
+{# Global settings (service commands, domain name, routing) #}
 {% include 'common/cisco/global_settings.j2' %}
 
-# Call-home configuration (optional, uncomment if needed)
-{#{% include 'common/cisco/call_home.j2' %}#}
+{# VRF definitions (before interfaces) #}
+{# {% include 'common/cisco/vrfs.j2' %} #}
 
-# VRF definitions (before interfaces)
-{% include 'common/cisco/vrfs.j2' %}
-
-# SNMP configuration for monitoring
+{# SNMP configuration for monitoring #}
 {% include 'common/cisco/ios_snmp.j2' %}
 
-# Console logging configuration
+{# Console logging configuration #}
 {% include 'common/cisco/logging_config.j2' %}
 
-# Enable secret for privileged access
+{# Enable secret for privileged access #}
 {% include 'common/cisco/enable_secret.j2' %}
 
-# Crypto and SSH settings
+{# Crypto and SSH settings #}
 {% include 'common/cisco/crypto.j2' %}
 
-# Policy maps for QoS (before interfaces)
+{# Policy maps for QoS (before interfaces) #}
 {% include 'common/cisco/policy_maps.j2' %}
 
-# Interface configurations
+{# Interface configurations #}
 {% include 'common/cisco/interfaces.j2' %}
 
-# Banner for login/MOTD
-{% include 'common/cisco/banner.j2' %}
+{# Banner for login/MOTD #}
+{# {% include 'common/cisco/banner.j2' %} #}
 
-# AAA configuration (including TACACS+ servers, before line configs)
+{# AAA configuration (including TACACS+ servers, before line configs) #}
 {% include 'common/cisco/aaa.j2' %}
 
-# Line configurations (console and VTY)
+{# Line configurations (console and VTY) #}
 {% include 'common/cisco/line_configs.j2' %}
 
-# NTP for time synchronization
+{# NTP for time synchronization #}
 {% include 'common/cisco/ntp.j2' %}
 
-# Syslog for centralized logging
+{# Syslog for centralized logging #}
 {% include 'common/cisco/syslog.j2' %}
 
 {# Access-lists can be enabled if needed #}
