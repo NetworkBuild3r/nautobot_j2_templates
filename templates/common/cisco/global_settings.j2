@@ -3,10 +3,10 @@
 {% include 'common/cisco/logging_config.j2' %}
 
 {# Enable secret for privileged access #}
-{% if 'enable_secret' in host.config_context %}
+{% if host.config_context.enable_secret is defined %}
 enable secret {{ host.config_context.enable_secret }}
 {% else %}
-enable secret {{ secrets_group["Device-Creds"] | get_secret_by_secret_group_name("enable_secret") }}
+{% raw %}enable secret {{ secrets_group["Device-Creds"] | get_secret_by_secret_group_name("enable_secret") }}{% endraw %}
 {% endif %}
 
 {# Crypto and SSH settings #}
@@ -17,7 +17,7 @@ service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
 service call-home
-{% if 'global_settings' in host.config_context %}
+{% if host.config_context.global_settings is defined %}
 {{ host.config_context.global_settings }}
 {% endif %}
 
