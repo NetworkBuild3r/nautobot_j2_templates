@@ -1,16 +1,12 @@
 ! Configuration for {{ host.hostname }}
 hostname {{ host.hostname }}
 
-! Debug: Context inspection
-{# {{ host | pprint }} #}
-{# {{ graphql_data | pprint }} #}
-
 ! Global Settings
 service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
 service call-home
-enable secret {{ get_secret_by_name('enable_secret', graphql_data.device.secrets_group.name | default('NAUTOBOT_PASSWORD')) }}
+enable secret {{ get_secret_by_name('enable_secret', 'NAUTOBOT_PASSWORD') }}
 
 ! VRF Definitions
 {% for vrf in host.vrfs %}
@@ -19,6 +15,40 @@ vrf definition {{ vrf.name }}
   exit-address-family
  address-family ipv6
   exit-address-family
+{% endfor %}
+
+! Interface Configurations
+{% for intf in host.interfaces %}
+interface {{ intf.name }}
+  {% if intf.description %}
+  description {{ intf.description }}
+  {% endif %}
+  {% if intf.name.startswith('Vlan') and intf.ip_addresses %}
+  ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
+  {% endif %}
+  {% if intf.vrf %}
+  vrf forwarding {{ intf.vrf.name }}
+  {% endif %}
+  {% if intf.tagged_vlans %}
+  switchport mode trunk
+  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}
+  {% if intf.untagged_vlan %}
+  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+  {% endif %}
+  {% elif intf.untagged_vlan %}
+  switchport mode access
+  switchport access vlan {{ intf.untagged_vlan.vid }}
+  {% if host.config_context.access_switch_defaults and host.config_context.access_switch_defaults.interface_defaults.voice_vlan %}
+  switchport voice vlan {{ host.config_context.access_switch_defaults.interface_defaults.voice_vlan }}
+  {% endif %}
+  spanning-tree portfast
+  spanning-tree bpduguard enable
+  {% endif %}
+  {% if intf.enabled %}
+  no shutdown
+  {% else %}
+  shutdown
+  {% endif %}
 {% endfor %}
 
 ! AAA Configuration
@@ -35,88 +65,7 @@ aaa accounting commands 15 vty start-stop {{ host.config_context.aaa.accounting.
 {% for server in host.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
  address ipv4 {{ server.ip_address }}
- key {{ get_secret_by_name(server.key, graphql_data.device.secrets_group.name | default('NAUTOBOT_PASSWORD')) }}
-{% endfor %}
-
-! VLAN Configurations
-{% set vlans = [] %}
-{% for intf in host.interfaces %}
-  {% if intf.untagged_vlan %}
-    {% set vlans = vlans + [intf.untagged_vlan] %}
-  {% endif %}
-  {% for vlan in intf.tagged_vlans %}
-    {% set vlans = vlans + [vlan] %}
-  {% endfor %}
-{% endfor %}
-{% for vlan in vlans | unique(attribute='vid') %}
-vlan {{ vlan.vid }}
- name {{ vlan.name }}
-{% endfor %}
-
-! Interface Configurations
-{% set defaults = host.config_context.access_switch_defaults.interface_defaults | default({}) %}
-{% for intf in host.interfaces %}
-interface {{ intf.name }}
-  {% if intf.description %}
-  description {{ intf.description }}
-  {% endif %}
-  {% if intf.name.startswith('Vlan') %}
-    {% if intf.ip_addresses %}
-    ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
-    {% endif %}
-    {% if intf.enabled %}
-    no shutdown
-    {% else %}
-    shutdown
-    {% endif %}
-  {% elif intf.name.startswith('Port-channel') %}
-    switchport mode trunk
-    {% if intf.untagged_vlan %}
-    switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-    {% endif %}
-    {% if intf.tagged_vlans %}
-    switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}
-    {% endif %}
-    no shutdown
-  {% else %}
-    {% if intf.vrf %}
-    vrf forwarding {{ intf.vrf.name }}
-    {% endif %}
-    {% if intf.ip_addresses %}
-    ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
-    {% elif intf.name == 'GigabitEthernet0/0' %}
-    ip address dhcp
-    {% endif %}
-    {% if intf.tagged_vlans %}
-    switchport mode trunk
-    switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}
-    {% if intf.untagged_vlan %}
-    switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-    {% endif %}
-    {% elif intf.untagged_vlan %}
-    switchport mode access
-    switchport access vlan {{ intf.untagged_vlan.vid }}
-    {% if defaults.voice_vlan %}
-    switchport voice vlan {{ defaults.voice_vlan }}
-    {% endif %}
-    {% if defaults.spanning_tree_portfast %}
-    spanning-tree portfast
-    {% endif %}
-    {% if defaults.bpduguard %}
-    spanning-tree bpduguard enable
-    {% endif %}
-    {% endif %}
-    {% for pc_intf in host.interfaces if pc_intf.name.startswith('Port-channel') %}
-      {% if intf.name in pc_intf.description %}
-      channel-group {{ pc_intf.name | replace('Port-channel', '') }} mode active
-      {% endif %}
-    {% endfor %}
-    {% if intf.enabled %}
-    no shutdown
-    {% else %}
-    shutdown
-    {% endif %}
-  {% endif %}
+ key {{ get_secret_by_name(server.key, 'NAUTOBOT_PASSWORD') }}
 {% endfor %}
 
 ! SNMP Configuration
@@ -124,7 +73,7 @@ snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }
 snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
 snmp-server location "{{ host.location.name }}"
 {% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {{ get_secret_by_name(comm.name, graphql_data.device.secrets_group.name | default('NAUTOBOT_PASSWORD')) }} {{ comm.permission }} {{ comm.timeout }}
+snmp-server community {{ get_secret_by_name(comm.name, 'NAUTOBOT_PASSWORD') }} {{ comm.permission }} {{ comm.timeout }}
 {% endfor %}
 {% for acl_number in ['51', '60'] %}
   {% set acl_key = 'acl_' ~ acl_number %}
@@ -139,7 +88,7 @@ ip access-list standard {{ acl_number }}
 snmp-server enable traps {{ trap }}
 {% endfor %}
 {% for host_ip in host.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community, graphql_data.device.secrets_group.name | default('NAUTOBOT_PASSWORD')) }}
+snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community, 'NAUTOBOT_PASSWORD') }}
 {% endfor %}
 
 ! NTP and Logging
@@ -162,15 +111,9 @@ banner motd ^C
 ^C
 
 ! IP Settings
-{% if host.config_context.site_pedc and host.config_context.site_pedc.default_gateway %}
-ip default-gateway {{ host.config_context.site_pedc.default_gateway }}
-{% endif %}
 ip http server
 ip http secure-server
 ip http client source-interface {{ host.config_context.syslog.source_interface }}
 ip tacacs source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh version 2
-{% for dns in host.config_context.dns %}
-{{ dns }}
-{% endfor %}
