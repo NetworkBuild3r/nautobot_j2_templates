@@ -1,6 +1,13 @@
 ! Configuration for {{ device.hostname }}
 hostname {{ device.hostname }}
 
+! Global Settings
+service timestamps debug datetime msec localtime show-timezone
+service timestamps log datetime msec localtime show-timezone
+service password-encryption
+service call-home
+enable secret {{ get_secret_by_name('enable_secret', device.secrets_group.name) }}
+
 ! VRF Definitions
 {% for vrf in device.vrfs %}
 vrf definition {{ vrf.name }}
@@ -24,19 +31,17 @@ aaa accounting commands 15 vty start-stop {{ device.config_context.aaa.accountin
 {% for server in device.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
  address ipv4 {{ server.ip_address }}
- key {{ get_secret_by_name(server.key) }}
+ key {{ get_secret_by_name(server.key, device.secrets_group.name) }}
 {% endfor %}
 
 ! VLAN Configurations
 {% set vlans = [] %}
 {% for intf in device.interfaces %}
-  {% if intf.untagged_vlan and intf.untagged_vlan not in vlans %}
-    {% do vlans.append(intf.untagged_vlan) %}
+  {% if intf.untagged_vlan %}
+    {% set vlans = vlans + [intf.untagged_vlan] %}
   {% endif %}
   {% for vlan in intf.tagged_vlans %}
-    {% if vlan not in vlans %}
-      {% do vlans.append(vlan) %}
-    {% endif %}
+    {% set vlans = vlans + [vlan] %}
   {% endfor %}
 {% endfor %}
 {% for vlan in vlans | unique(attribute='vid') %}
@@ -92,10 +97,9 @@ interface {{ intf.name }}
     spanning-tree bpduguard enable
     {% endif %}
     {% for pc_intf in device.interfaces if pc_intf.name.startswith('Port-channel') %}
-    {% set pc_members = pc_intf.description | regex_search('Te\d+/\d+/\d+') | list %}
-    {% if intf.name in pc_members %}
-    channel-group {{ pc_intf.name | replace('Port-channel', '') }} mode active
-    {% endif %}
+      {% if intf.name in pc_intf.description %}
+      channel-group {{ pc_intf.name | replace('Port-channel', '') }} mode active
+      {% endif %}
     {% endfor %}
     {% if intf.enabled %}
     no shutdown
@@ -108,15 +112,24 @@ interface {{ intf.name }}
 ! SNMP Configuration
 snmp-server trap-source {{ device.config_context.cisco_snmp_ios.snmp.trap_source }}
 snmp-server contact "{{ device.config_context.cisco_snmp_ios.snmp.contact }}"
-snmp-server location {{ device.location.name }}
+snmp-server location "{{ device.config_context.site_pedc.snmp.location }}"
 {% for comm in device.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {{ get_secret_by_name(comm.name) }} {{ comm.permission }} {{ comm.timeout }}
+snmp-server community {{ get_secret_by_name(comm.name, device.secrets_group.name) }} {{ comm.permission }} {{ comm.timeout }}
+{% endfor %}
+{% for acl_number in ['51', '60'] %}
+  {% set acl_key = 'acl_' ~ acl_number %}
+  {% if acl_key in device.config_context.cisco_snmp_ios.snmp %}
+ip access-list standard {{ acl_number }}
+    {% for rule in device.config_context.cisco_snmp_ios.snmp[acl_key] %}
+    {{ rule }}
+    {% endfor %}
+  {% endif %}
 {% endfor %}
 {% for trap in device.config_context.cisco_snmp_ios.snmp.enable_traps %}
 snmp-server enable traps {{ trap }}
 {% endfor %}
 {% for host_ip in device.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community) }}
+snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community, device.secrets_group.name) }}
 {% endfor %}
 
 ! NTP and Logging
@@ -129,6 +142,9 @@ line con 0
  {{ device.config_context.line_configs.console }}
 line vty 0 4
  {{ device.config_context.line_configs.vty }}
+ access-class 51 in
+ transport input ssh
+ transport output ssh
 
 ! Banner
 banner motd ^C
