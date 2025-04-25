@@ -1,15 +1,15 @@
-! Configuration for {{ device.hostname }}
-hostname {{ device.hostname }}
+! Configuration for {{ host.hostname }}
+hostname {{ host.hostname }}
 
 ! Global Settings
 service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
 service call-home
-enable secret {{ get_secret_by_name('enable_secret', device.secrets_group.name) }}
+enable secret {{ get_secret_by_name('enable_secret', host.secrets_group.name) }}
 
 ! VRF Definitions
-{% for vrf in device.vrfs %}
+{% for vrf in host.vrfs %}
 vrf definition {{ vrf.name }}
  address-family ipv4
   exit-address-family
@@ -19,24 +19,24 @@ vrf definition {{ vrf.name }}
 
 ! AAA Configuration
 aaa new-model
-aaa authentication login default {{ device.config_context.aaa.authentication.login.default }}
-aaa authentication login console {{ device.config_context.aaa.authentication.login.console }}
-aaa authentication enable default {{ device.config_context.aaa.authentication.enable }}
-aaa authentication dot1x default {{ device.config_context.aaa.authentication.dot1x }}
-aaa authorization exec default {{ device.config_context.aaa.authorization.exec }}
-aaa authorization network default {{ device.config_context.aaa.authorization.network }}
-aaa accounting exec vty start-stop {{ device.config_context.aaa.accounting.exec }}
-aaa accounting commands 0 vty start-stop {{ device.config_context.aaa.accounting.commands['0'] }}
-aaa accounting commands 15 vty start-stop {{ device.config_context.aaa.accounting.commands['15'] }}
-{% for server in device.config_context.aaa.tacacs_servers %}
+aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
+aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
+aaa authentication enable default {{ host.config_context.aaa.authentication.enable }}
+aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
+aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}
+aaa authorization network default {{ host.config_context.aaa.authorization.network }}
+aaa accounting exec vty start-stop {{ host.config_context.aaa.accounting.exec }}
+aaa accounting commands 0 vty start-stop {{ host.config_context.aaa.accounting.commands['0'] }}
+aaa accounting commands 15 vty start-stop {{ host.config_context.aaa.accounting.commands['15'] }}
+{% for server in host.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
  address ipv4 {{ server.ip_address }}
- key {{ get_secret_by_name(server.key, device.secrets_group.name) }}
+ key {{ get_secret_by_name(server.key, host.secrets_group.name) }}
 {% endfor %}
 
 ! VLAN Configurations
 {% set vlans = [] %}
-{% for intf in device.interfaces %}
+{% for intf in host.interfaces %}
   {% if intf.untagged_vlan %}
     {% set vlans = vlans + [intf.untagged_vlan] %}
   {% endif %}
@@ -50,8 +50,8 @@ vlan {{ vlan.vid }}
 {% endfor %}
 
 ! Interface Configurations
-{% set defaults = device.config_context.access_switch_defaults.interface_defaults %}
-{% for intf in device.interfaces %}
+{% set defaults = host.config_context.access_switch_defaults.interface_defaults %}
+{% for intf in host.interfaces %}
 interface {{ intf.name }}
   {% if intf.description %}
   description {{ intf.description }}
@@ -96,7 +96,7 @@ interface {{ intf.name }}
     spanning-tree portfast
     spanning-tree bpduguard enable
     {% endif %}
-    {% for pc_intf in device.interfaces if pc_intf.name.startswith('Port-channel') %}
+    {% for pc_intf in host.interfaces if pc_intf.name.startswith('Port-channel') %}
       {% if intf.name in pc_intf.description %}
       channel-group {{ pc_intf.name | replace('Port-channel', '') }} mode active
       {% endif %}
@@ -110,55 +110,55 @@ interface {{ intf.name }}
 {% endfor %}
 
 ! SNMP Configuration
-snmp-server trap-source {{ device.config_context.cisco_snmp_ios.snmp.trap_source }}
-snmp-server contact "{{ device.config_context.cisco_snmp_ios.snmp.contact }}"
-snmp-server location "{{ device.config_context.site_pedc.snmp.location }}"
-{% for comm in device.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {{ get_secret_by_name(comm.name, device.secrets_group.name) }} {{ comm.permission }} {{ comm.timeout }}
+snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
+snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
+snmp-server location "{{ host.config_context.site_pedc.snmp.location }}"
+{% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
+snmp-server community {{ get_secret_by_name(comm.name, host.secrets_group.name) }} {{ comm.permission }} {{ comm.timeout }}
 {% endfor %}
 {% for acl_number in ['51', '60'] %}
   {% set acl_key = 'acl_' ~ acl_number %}
-  {% if acl_key in device.config_context.cisco_snmp_ios.snmp %}
+  {% if acl_key in host.config_context.cisco_snmp_ios.snmp %}
 ip access-list standard {{ acl_number }}
-    {% for rule in device.config_context.cisco_snmp_ios.snmp[acl_key] %}
+    {% for rule in host.config_context.cisco_snmp_ios.snmp[acl_key] %}
     {{ rule }}
     {% endfor %}
   {% endif %}
 {% endfor %}
-{% for trap in device.config_context.cisco_snmp_ios.snmp.enable_traps %}
+{% for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}
 snmp-server enable traps {{ trap }}
 {% endfor %}
-{% for host_ip in device.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community, device.secrets_group.name) }}
+{% for host_ip in host.config_context.cisco_snmp_ios.snmp.hosts %}
+snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community, host.secrets_group.name) }}
 {% endfor %}
 
 ! NTP and Logging
-ntp server {{ device.config_context.ntp.servers[0] }}
-logging source-interface {{ device.config_context.syslog.source_interface }}
-logging host {{ device.config_context.syslog.logging_host }}
+ntp server {{ host.config_context.ntp.servers[0] }}
+logging source-interface {{ host.config_context.syslog.source_interface }}
+logging host {{ host.config_context.syslog.logging_host }}
 
 ! Line Configurations
 line con 0
- {{ device.config_context.line_configs.console }}
+ {{ host.config_context.line_configs.console }}
 line vty 0 4
- {{ device.config_context.line_configs.vty }}
+ {{ host.config_context.line_configs.vty }}
  access-class 51 in
  transport input ssh
  transport output ssh
 
 ! Banner
 banner motd ^C
-{{ device.config_context.data.banner_motd }}
+{{ host.config_context.data.banner_motd }}
 ^C
 
 ! IP Settings
-ip default-gateway {{ device.config_context.site_pedc.default_gateway }}
+ip default-gateway {{ host.config_context.site_pedc.default_gateway }}
 ip http server
 ip http secure-server
-ip http client source-interface {{ device.config_context.syslog.source_interface }}
-ip tacacs source-interface {{ device.config_context.syslog.source_interface }}
-ip ssh source-interface {{ device.config_context.syslog.source_interface }}
+ip http client source-interface {{ host.config_context.syslog.source_interface }}
+ip tacacs source-interface {{ host.config_context.syslog.source_interface }}
+ip ssh source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh version 2
-{% for dns in device.config_context.dns %}
+{% for dns in host.config_context.dns %}
 {{ dns }}
 {% endfor %}
