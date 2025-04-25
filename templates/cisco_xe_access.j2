@@ -1,12 +1,15 @@
 ! Configuration for {{ host.hostname }}
 hostname {{ host.hostname }}
 
+! Debug: Host data structure
+{# {{ host | pprint }} #}
+
 ! Global Settings
 service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
 service call-home
-enable secret {{ get_secret_by_name('enable_secret', host.secrets_group.name) }}
+enable secret {{ get_secret_by_name('enable_secret', host.data.secrets_group.name | default('NAUTOBOT_PASSWORD')) }}
 
 ! VRF Definitions
 {% for vrf in host.vrfs %}
@@ -31,7 +34,7 @@ aaa accounting commands 15 vty start-stop {{ host.config_context.aaa.accounting.
 {% for server in host.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
  address ipv4 {{ server.ip_address }}
- key {{ get_secret_by_name(server.key, host.secrets_group.name) }}
+ key {{ get_secret_by_name(server.key, host.data.secrets_group.name | default('NAUTOBOT_PASSWORD')) }}
 {% endfor %}
 
 ! VLAN Configurations
@@ -50,7 +53,7 @@ vlan {{ vlan.vid }}
 {% endfor %}
 
 ! Interface Configurations
-{% set defaults = host.config_context.access_switch_defaults.interface_defaults %}
+{% set defaults = host.config_context.access_switch_defaults.interface_defaults | default({}) %}
 {% for intf in host.interfaces %}
 interface {{ intf.name }}
   {% if intf.description %}
@@ -92,9 +95,15 @@ interface {{ intf.name }}
     {% elif intf.untagged_vlan %}
     switchport mode access
     switchport access vlan {{ intf.untagged_vlan.vid }}
+    {% if defaults.voice_vlan %}
     switchport voice vlan {{ defaults.voice_vlan }}
+    {% endif %}
+    {% if defaults.spanning_tree_portfast %}
     spanning-tree portfast
+    {% endif %}
+    {% if defaults.bpduguard %}
     spanning-tree bpduguard enable
+    {% endif %}
     {% endif %}
     {% for pc_intf in host.interfaces if pc_intf.name.startswith('Port-channel') %}
       {% if intf.name in pc_intf.description %}
@@ -112,9 +121,9 @@ interface {{ intf.name }}
 ! SNMP Configuration
 snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
 snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
-snmp-server location "{{ host.config_context.site_pedc.snmp.location }}"
+snmp-server location "{{ host.location.name }}"
 {% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {{ get_secret_by_name(comm.name, host.secrets_group.name) }} {{ comm.permission }} {{ comm.timeout }}
+snmp-server community {{ get_secret_by_name(comm.name, host.data.secrets_group.name | default('NAUTOBOT_PASSWORD')) }} {{ comm.permission }} {{ comm.timeout }}
 {% endfor %}
 {% for acl_number in ['51', '60'] %}
   {% set acl_key = 'acl_' ~ acl_number %}
@@ -129,7 +138,7 @@ ip access-list standard {{ acl_number }}
 snmp-server enable traps {{ trap }}
 {% endfor %}
 {% for host_ip in host.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community, host.secrets_group.name) }}
+snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community, host.data.secrets_group.name | default('NAUTOBOT_PASSWORD')) }}
 {% endfor %}
 
 ! NTP and Logging
@@ -152,7 +161,9 @@ banner motd ^C
 ^C
 
 ! IP Settings
+{% if host.config_context.site_pedc.default_gateway %}
 ip default-gateway {{ host.config_context.site_pedc.default_gateway }}
+{% endif %}
 ip http server
 ip http secure-server
 ip http client source-interface {{ host.config_context.syslog.source_interface }}
