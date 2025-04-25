@@ -1,21 +1,21 @@
-{% for interface in host.interfaces %}
-interface {{ interface.name }}
-  {%- if interface.tagged_vlans %}
-  switchport mode trunk
-  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
-  {%- elif interface.untagged_vlan %}
-  switchport mode access
-  switchport access vlan {{ interface.untagged_vlan.vid }}
-  {%- endif %}
-  {%- if interface.description %}
-  description {{ interface.description }}
-  {%- endif %}
-  {%- for addr in interface.ip_addresses %}
-  ip address {{ addr.address.split('/')[0] }} {{ addr.address.split('/')[1] | int | cidr_to_netmask }}
-  {%- endfor %}
-  {%- if interface.enabled | default(false) %}
-  no shutdown
-  {%- else %}
-  shutdown
-  {%- endif %}
-{% endfor %}
+{# common/cisco/interfaces.j2 #}
+{%- set allowed = interface.tagged_vlans | default([]) | map(attribute='vid') | list -%}
+
+{%- if allowed -%}
+ switchport mode trunk
+ switchport trunk allowed vlan {{ allowed | join(',') }}
+{%- elif interface.untagged_vlan -%}
+ switchport mode access
+ switchport access vlan {{ interface.untagged_vlan.vid }}
+{%- endif -%}
+
+{%- for addr in interface.ip_addresses | map(attribute='address') -%}
+ ip address {{ addr.split('/')[0] }}
+            {{ addr.split('/')[1]|int|cidr_to_netmask }}
+{%- endfor -%}
+
+{%- if interface.enabled | default(false) -%}
+ no shutdown
+{%- else -%}
+ shutdown
+{%- endif -%}
