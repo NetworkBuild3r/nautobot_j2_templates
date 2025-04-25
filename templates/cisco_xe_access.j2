@@ -1,13 +1,148 @@
-{# Main template for Cisco XE access switches #}
-{% include 'common/cisco/hostname.j2' %}
-{% include 'common/cisco/global_settings.j2' %}
-{% include 'common/cisco/vrfs.j2' %}
-{% include 'common/cisco/aaa.j2' %}
-{% include 'common/cisco/interfaces.j2' %}
-{% include 'common/cisco/ios_snmp.j2' %}
-{% include 'common/cisco/ntp.j2' %}
-{% include 'common/cisco/syslog.j2' %}
+! Configuration for {{ device.hostname }}
+hostname {{ device.hostname }}
 
-{# Access-specific configurations #}
-{% include 'access/management_svi.j2' %}
-{% include 'access/uplink_portchannel.j2' %}
+! VRF Definitions
+{% for vrf in device.vrfs %}
+vrf definition {{ vrf.name }}
+ address-family ipv4
+  exit-address-family
+ address-family ipv6
+  exit-address-family
+{% endfor %}
+
+! AAA Configuration
+aaa new-model
+aaa authentication login default {{ device.config_context.aaa.authentication.login.default }}
+aaa authentication login console {{ device.config_context.aaa.authentication.login.console }}
+aaa authentication enable default {{ device.config_context.aaa.authentication.enable }}
+aaa authentication dot1x default {{ device.config_context.aaa.authentication.dot1x }}
+aaa authorization exec default {{ device.config_context.aaa.authorization.exec }}
+aaa authorization network default {{ device.config_context.aaa.authorization.network }}
+aaa accounting exec vty start-stop {{ device.config_context.aaa.accounting.exec }}
+aaa accounting commands 0 vty start-stop {{ device.config_context.aaa.accounting.commands['0'] }}
+aaa accounting commands 15 vty start-stop {{ device.config_context.aaa.accounting.commands['15'] }}
+{% for server in device.config_context.aaa.tacacs_servers %}
+tacacs server {{ server.name }}
+ address ipv4 {{ server.ip_address }}
+ key {{ get_secret_by_name(server.key) }}
+{% endfor %}
+
+! VLAN Configurations
+{% set vlans = [] %}
+{% for intf in device.interfaces %}
+  {% if intf.untagged_vlan and intf.untagged_vlan not in vlans %}
+    {% do vlans.append(intf.untagged_vlan) %}
+  {% endif %}
+  {% for vlan in intf.tagged_vlans %}
+    {% if vlan not in vlans %}
+      {% do vlans.append(vlan) %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+{% for vlan in vlans | unique(attribute='vid') %}
+vlan {{ vlan.vid }}
+ name {{ vlan.name }}
+{% endfor %}
+
+! Interface Configurations
+{% set defaults = device.config_context.access_switch_defaults.interface_defaults %}
+{% for intf in device.interfaces %}
+interface {{ intf.name }}
+  {% if intf.description %}
+  description {{ intf.description }}
+  {% endif %}
+  {% if intf.name.startswith('Vlan') %}
+    {% if intf.ip_addresses %}
+    ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
+    {% endif %}
+    {% if intf.enabled %}
+    no shutdown
+    {% else %}
+    shutdown
+    {% endif %}
+  {% elif intf.name.startswith('Port-channel') %}
+    switchport mode trunk
+    {% if intf.untagged_vlan %}
+    switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+    {% endif %}
+    {% if intf.tagged_vlans %}
+    switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}
+    {% endif %}
+    no shutdown
+  {% else %}
+    {% if intf.vrf %}
+    vrf forwarding {{ intf.vrf.name }}
+    {% endif %}
+    {% if intf.ip_addresses %}
+    ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
+    {% elif intf.name == 'GigabitEthernet0/0' %}
+    ip address dhcp
+    {% endif %}
+    {% if intf.tagged_vlans %}
+    switchport mode trunk
+    switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}
+    {% if intf.untagged_vlan %}
+    switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+    {% endif %}
+    {% elif intf.untagged_vlan %}
+    switchport mode access
+    switchport access vlan {{ intf.untagged_vlan.vid }}
+    switchport voice vlan {{ defaults.voice_vlan }}
+    spanning-tree portfast
+    spanning-tree bpduguard enable
+    {% endif %}
+    {% for pc_intf in device.interfaces if pc_intf.name.startswith('Port-channel') %}
+    {% set pc_members = pc_intf.description | regex_search('Te\d+/\d+/\d+') | list %}
+    {% if intf.name in pc_members %}
+    channel-group {{ pc_intf.name | replace('Port-channel', '') }} mode active
+    {% endif %}
+    {% endfor %}
+    {% if intf.enabled %}
+    no shutdown
+    {% else %}
+    shutdown
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+! SNMP Configuration
+snmp-server trap-source {{ device.config_context.cisco_snmp_ios.snmp.trap_source }}
+snmp-server contact "{{ device.config_context.cisco_snmp_ios.snmp.contact }}"
+snmp-server location {{ device.location.name }}
+{% for comm in device.config_context.cisco_snmp_ios.snmp.communities %}
+snmp-server community {{ get_secret_by_name(comm.name) }} {{ comm.permission }} {{ comm.timeout }}
+{% endfor %}
+{% for trap in device.config_context.cisco_snmp_ios.snmp.enable_traps %}
+snmp-server enable traps {{ trap }}
+{% endfor %}
+{% for host_ip in device.config_context.cisco_snmp_ios.snmp.hosts %}
+snmp-server host {{ host_ip.ip }} {{ get_secret_by_name(host_ip.community) }}
+{% endfor %}
+
+! NTP and Logging
+ntp server {{ device.config_context.ntp.servers[0] }}
+logging source-interface {{ device.config_context.syslog.source_interface }}
+logging host {{ device.config_context.syslog.logging_host }}
+
+! Line Configurations
+line con 0
+ {{ device.config_context.line_configs.console }}
+line vty 0 4
+ {{ device.config_context.line_configs.vty }}
+
+! Banner
+banner motd ^C
+{{ device.config_context.data.banner_motd }}
+^C
+
+! IP Settings
+ip default-gateway {{ device.config_context.site_pedc.default_gateway }}
+ip http server
+ip http secure-server
+ip http client source-interface {{ device.config_context.syslog.source_interface }}
+ip tacacs source-interface {{ device.config_context.syslog.source_interface }}
+ip ssh source-interface {{ device.config_context.syslog.source_interface }}
+ip ssh version 2
+{% for dns in device.config_context.dns %}
+{{ dns }}
+{% endfor %}
