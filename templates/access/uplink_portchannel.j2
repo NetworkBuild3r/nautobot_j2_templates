@@ -1,0 +1,21 @@
+{# access/uplink_portchannel.j2 #}
+{# Configures uplink Port-Channel for access switches #}
+{% if host.config_context.uplink is defined %}
+interface Port-channel{{ host.config_context.uplink.pc | default('1') }}
+  description Uplink to {{ host.config_context.uplink.peer | default('core-switch') }}
+  switchport mode trunk
+  switchport trunk native vlan {{ host.config_context.uplink.native_vlan | default('1') }}
+  no shutdown
+
+{% for member in host.config_context.uplink.members | default([]) %}
+interface {{ member }}
+  description Member of Port-channel{{ host.config_context.uplink.pc | default('1') }}
+  channel-group {{ host.config_context.uplink.pc | default('1') }} mode active
+  switchport mode trunk
+  no shutdown
+{% endfor %}
+{% else %}
+{# Fallback if uplink data is missing #}
+{# Log a comment for debugging, won't appear in final config #}
+{# No uplink configuration defined in config_context.uplink #}
+{% endif %}

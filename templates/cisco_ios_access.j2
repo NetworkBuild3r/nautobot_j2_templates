@@ -1,48 +1,13 @@
-# File: role/{{ obj.platform.network_driver }}_{{ obj.role.name|lower }}.j2
-{#hostname {{ host.name }}#}
+{# Main template for Cisco XE access switches #}
 {% include 'common/cisco/hostname.j2' %}
-{#{% include 'common/cisco/global_settings.j2' %}#}
-{#{% include 'common/cisco/vrfs.j2' %}#}
-{#{% include 'common/cisco/ios_snmp.j2' %}#}
-{#{% include 'common/cisco/logging_config.j2' %}#}
-{#{% include 'common/cisco/enable_secret.j2' %}#}
-{#{% include 'common/cisco/crypto.j2' %}#}
-{#{% include 'common/cisco/policy_maps.j2' %}#}
-{#{% include 'common/cisco/interfaces.j2' %}#}
-{# Access‑lists can be enabled if needed #}
-{# {% include 'common/cisco/access_lists.j2' %} #}
-{#{% include 'common/cisco/banner.j2' %}#}
-{#{% include 'common/cisco/line_configs.j2' %}#}
-{#{% include 'common/cisco/call_home.j2' %}#}
-{#{% include 'common/cisco/aaa.j2' %}#}
-{#{% include 'common/cisco/ntp.j2' %}#}
-{#{% include 'common/cisco/syslog.j2' %}#}
-{##}
-{#! — Access‑only tweaks below —#}
-{##}
-{#{% for intf in host.interfaces if intf.untagged_vlan %}#}
-{#interface {{ intf.name }}#}
-{#  switchport mode access#}
-{#  switchport access vlan {{ intf.untagged_vlan.vid }}#}
-{#  {% if intf.tagged_vlans %}#}
-{#  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}#}
-{#  {% endif %}#}
-{#  {% if intf.description %}description {{ intf.description }}{% endif %}#}
-{#  spanning-tree portfast#}
-{#  spanning-tree bpduguard enable#}
-{#{% endfor %}#}
-{##}
-{#! Management SVI#}
-{#interface Vlan{{ host.config_context.mgmt.vlan }}#}
-{#  ip address {{ host.config_context.mgmt.ip }} {{ host.config_context.mgmt.mask }}#}
-{#  no shutdown#}
-{##}
-{#! Uplink Port‑Channel#}
-{#interface Port-channel{{ host.config_context.uplink.pc }}#}
-{#  description Uplink to {{ host.config_context.uplink.peer }}#}
-{#  switchport mode trunk#}
-{#  switchport trunk native vlan {{ host.config_context.uplink.native_vlan }}#}
-{#{% for member in host.config_context.uplink.members %}#}
-{#interface {{ member }}#}
-{#  channel-group {{ host.config_context.uplink.pc }} mode active#}
-{#{% endfor %}#}
+{% include 'common/cisco/global_settings.j2' %}
+{% include 'common/cisco/vrfs.j2' %}
+{% include 'common/cisco/aaa.j2' %}
+{% include 'common/cisco/interfaces.j2' %}
+{% include 'common/cisco/ios_snmp.j2' %}
+{% include 'common/cisco/ntp.j2' %}
+{% include 'common/cisco/syslog.j2' %}
+
+{# Access-specific configurations #}
+{% include 'access/management_svi.j2' %}
+{% include 'access/uplink_portchannel.j2' %}
