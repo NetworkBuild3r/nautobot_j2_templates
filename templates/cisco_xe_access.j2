@@ -1,109 +1,109 @@
-{%- include 'common/cisco/global_settings.j2' -%}
+{#{%- include 'common/cisco/global_settings.j2' -%}#}
 {#{%- include 'common/cisco/vrfs.j2' -%}#}
-{%- include 'common/cisco/vlans.j2' -%}
-{%- include 'common/cisco/spanning_tree.j2' -%}
-{% include 'common/cisco/spanning_tree.j2' %}
+{#{%- include 'common/cisco/vlans.j2' -%}#}
+{#{%- include 'common/cisco/spanning_tree.j2' -%}#}
+{#{% include 'common/cisco/spanning_tree.j2' %}#}
 {% include 'common/cisco/interfaces.j2' %}
 
-! AAA Configuration
-aaa new-model
-aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
-aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
-aaa authentication enable default {{ host.config_context.aaa.authentication.enable }}
-aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
-aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}
-aaa authorization network default {{ host.config_context.aaa.authorization.network }}
-aaa authorization auth-proxy default group radius
-aaa accounting delay-start all
-aaa accounting auth-proxy default start-stop group radius
-aaa accounting dot1x default start-stop group radius
-aaa accounting exec vty start-stop group tacacs+
-aaa accounting commands 0 vty start-stop group tacacs+
-aaa accounting commands 15 vty start-stop group tacacs+
-aaa accounting network default start-stop group radius
-{% for server in host.config_context.aaa.tacacs_servers %}
-tacacs server {{ server.name }}
- address ipv4 {{ server.ip_address }}
- key {{ server.key | default('<TACACS_KEY>') }}
-{% endfor %}
-
-! SNMP Configuration
-snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
-snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
-snmp-server location "{{ host.location.name }} - {{ host.config_context.site_pedc.snmp.location }}"
-{% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {{ comm.name }} {{ comm.permission }} {{ comm.timeout }}
-{% endfor %}
-{% for acl_number in ['51', '60'] %}
-  {% set acl_key = 'acl_' ~ acl_number %}
-  {% if acl_key in host.config_context.cisco_snmp_ios.snmp %}
-ip access-list standard {{ acl_number }}
-    {% for rule in host.config_context.cisco_snmp_ios.snmp[acl_key] %}
-    {{ rule }}
-    {% endfor %}
-  {% endif %}
-{% endfor %}
-{% for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}
-snmp-server enable traps {{ trap }}
-{% endfor %}
-{% for host_ip in host.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ host_ip.ip }} version 2c {{ host_ip.community }}
-{% endfor %}
-
-! NTP and Logging
-ntp server {{ host.config_context.ntp.servers[0] }}
-logging source-interface {{ host.config_context.syslog.source_interface }}
-logging host {{ host.config_context.syslog.logging_host }}
-
-! Line Configurations
-line con 0
- exec-timeout 0 0
- logging synchronous
- login authentication console
- stopbits 1
-line vty 0 4
- transport input ssh
- exec-timeout 15 0
- access-class 51 in
- accounting commands 0 vty
- accounting commands 15 vty
- accounting exec vty
- logging synchronous
- length 0
- transport preferred none
- transport input ssh
- transport output ssh
-line vty 5 15
- transport input ssh
- exec-timeout 15 0
- access-class 51 in
- accounting commands 0 vty
- accounting commands 15 vty
- accounting exec vty
- logging synchronous
- length 0
- transport preferred none
- transport input ssh
- transport output ssh
-line vty 16 31
- transport input ssh
-
-! Banner
-banner login ^CCC
-{{ host.config_context.data.banner_motd }}
-^C
-
-! IP Settings
-ip default-gateway {{ host.config_context.site_pedc.default_gateway }}
-ip http server
-ip http authentication local
-ip http secure-server
-ip http client source-interface {{ host.config_context.syslog.source_interface }}
-ip forward-protocol nd
-ip tacacs source-interface {{ host.config_context.syslog.source_interface }}
-ip ssh source-interface {{ host.config_context.syslog.source_interface }}
-ip ssh version 2
-{% for dns in host.config_context.dns %}
-{{ dns }}
-{% endfor %}
-ip domain lookup source-interface {{ host.config_context.syslog.source_interface }}
+{#! AAA Configuration#}
+{#aaa new-model#}
+{#aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}#}
+{#aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}#}
+{#aaa authentication enable default {{ host.config_context.aaa.authentication.enable }}#}
+{#aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}#}
+{#aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}#}
+{#aaa authorization network default {{ host.config_context.aaa.authorization.network }}#}
+{#aaa authorization auth-proxy default group radius#}
+{#aaa accounting delay-start all#}
+{#aaa accounting auth-proxy default start-stop group radius#}
+{#aaa accounting dot1x default start-stop group radius#}
+{#aaa accounting exec vty start-stop group tacacs+#}
+{#aaa accounting commands 0 vty start-stop group tacacs+#}
+{#aaa accounting commands 15 vty start-stop group tacacs+#}
+{#aaa accounting network default start-stop group radius#}
+{#{% for server in host.config_context.aaa.tacacs_servers %}#}
+{#tacacs server {{ server.name }}#}
+{# address ipv4 {{ server.ip_address }}#}
+{# key {{ server.key | default('<TACACS_KEY>') }}#}
+{#{% endfor %}#}
+{##}
+{#! SNMP Configuration#}
+{#snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}#}
+{#snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"#}
+{#snmp-server location "{{ host.location.name }} - {{ host.config_context.site_pedc.snmp.location }}"#}
+{#{% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}#}
+{#snmp-server community {{ comm.name }} {{ comm.permission }} {{ comm.timeout }}#}
+{#{% endfor %}#}
+{#{% for acl_number in ['51', '60'] %}#}
+{#  {% set acl_key = 'acl_' ~ acl_number %}#}
+{#  {% if acl_key in host.config_context.cisco_snmp_ios.snmp %}#}
+{#ip access-list standard {{ acl_number }}#}
+{#    {% for rule in host.config_context.cisco_snmp_ios.snmp[acl_key] %}#}
+{#    {{ rule }}#}
+{#    {% endfor %}#}
+{#  {% endif %}#}
+{#{% endfor %}#}
+{#{% for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}#}
+{#snmp-server enable traps {{ trap }}#}
+{#{% endfor %}#}
+{#{% for host_ip in host.config_context.cisco_snmp_ios.snmp.hosts %}#}
+{#snmp-server host {{ host_ip.ip }} version 2c {{ host_ip.community }}#}
+{#{% endfor %}#}
+{##}
+{#! NTP and Logging#}
+{#ntp server {{ host.config_context.ntp.servers[0] }}#}
+{#logging source-interface {{ host.config_context.syslog.source_interface }}#}
+{#logging host {{ host.config_context.syslog.logging_host }}#}
+{##}
+{#! Line Configurations#}
+{#line con 0#}
+{# exec-timeout 0 0#}
+{# logging synchronous#}
+{# login authentication console#}
+{# stopbits 1#}
+{#line vty 0 4#}
+{# transport input ssh#}
+{# exec-timeout 15 0#}
+{# access-class 51 in#}
+{# accounting commands 0 vty#}
+{# accounting commands 15 vty#}
+{# accounting exec vty#}
+{# logging synchronous#}
+{# length 0#}
+{# transport preferred none#}
+{# transport input ssh#}
+{# transport output ssh#}
+{#line vty 5 15#}
+{# transport input ssh#}
+{# exec-timeout 15 0#}
+{# access-class 51 in#}
+{# accounting commands 0 vty#}
+{# accounting commands 15 vty#}
+{# accounting exec vty#}
+{# logging synchronous#}
+{# length 0#}
+{# transport preferred none#}
+{# transport input ssh#}
+{# transport output ssh#}
+{#line vty 16 31#}
+{# transport input ssh#}
+{##}
+{#! Banner#}
+{#banner login ^CCC#}
+{#{{ host.config_context.data.banner_motd }}#}
+{#^C#}
+{##}
+{#! IP Settings#}
+{#ip default-gateway {{ host.config_context.site_pedc.default_gateway }}#}
+{#ip http server#}
+{#ip http authentication local#}
+{#ip http secure-server#}
+{#ip http client source-interface {{ host.config_context.syslog.source_interface }}#}
+{#ip forward-protocol nd#}
+{#ip tacacs source-interface {{ host.config_context.syslog.source_interface }}#}
+{#ip ssh source-interface {{ host.config_context.syslog.source_interface }}#}
+{#ip ssh version 2#}
+{#{% for dns in host.config_context.dns %}#}
+{#{{ dns }}#}
+{#{% endfor %}#}
+{#ip domain lookup source-interface {{ host.config_context.syslog.source_interface }}#}
