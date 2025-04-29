@@ -1,21 +1,12 @@
-! Configuration for {{ host.hostname }}
-hostname {{ host.hostname }}
+{%- include 'common/cisco/global_settings.j2' -%}
+{%- include 'common/cisco/vrfs.j2' -%}
+{%- include 'common/cisco/vlans.j2' -%}
 
-! Global Settings
-service timestamps debug datetime msec localtime show-timezone
-service timestamps log datetime msec localtime show-timezone
-service password-encryption
-service call-home
-enable secret <ENABLE_SECRET>
-
-! VRF Definitions
-{% for vrf in host.vrfs %}
-vrf definition {{ vrf.name }}
- address-family ipv4
-  exit-address-family
- address-family ipv6
-  exit-address-family
-{% endfor %}
+! Spanning-Tree Configuration
+spanning-tree mode mst
+spanning-tree extend system-id
+spanning-tree vlan 1-4094 priority 61440
+spanning-tree mst 0 priority 61440
 
 ! Interface Configurations
 {% for intf in host.interfaces %}
@@ -28,22 +19,41 @@ interface {{ intf.name }}
   {% endif %}
   {% if intf.vrf %}
   vrf forwarding {{ intf.vrf.name }}
+  ip address dhcp
+  negotiation auto
   {% endif %}
-  {% if intf.tagged_vlans %}
+  {% if intf.tagged_vlans or 'Uplink' in intf.description %}
   switchport mode trunk
-  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') }}
+  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') if intf.tagged_vlans else 'all' }}
   {% if intf.untagged_vlan %}
   switchport trunk native vlan {{ intf.untagged_vlan.vid }}
   {% endif %}
   {% elif intf.untagged_vlan %}
   switchport mode access
   switchport access vlan {{ intf.untagged_vlan.vid }}
+  {% if intf.untagged_vlan.vid != 1000 and not intf.name.startswith('Vlan') %}
+  switchport voice vlan {{ host.config_context.access_switch_defaults.interface_defaults.voice_vlan }}
+  spanning-tree portfast
+  spanning-tree bpduguard enable
+  {% endif %}
+  {% endif %}
+  {% if intf.name.startswith('TenGigabitEthernet') and 'PO102' in intf.description %}
+  channel-group 102 mode active
   {% endif %}
   {% if intf.enabled %}
   no shutdown
   {% else %}
   shutdown
   {% endif %}
+{% endfor %}
+
+! Port-Channel Configurations
+{% for intf in host.interfaces if intf.name.startswith('Port-channel') %}
+interface {{ intf.name }}
+  description {{ intf.description }}
+  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+  switchport mode trunk
+  no shutdown
 {% endfor %}
 
 ! AAA Configuration
@@ -54,21 +64,26 @@ aaa authentication enable default {{ host.config_context.aaa.authentication.enab
 aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
 aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}
 aaa authorization network default {{ host.config_context.aaa.authorization.network }}
-aaa accounting exec vty start-stop {{ host.config_context.aaa.accounting.exec }}
-aaa accounting commands 0 vty start-stop {{ host.config_context.aaa.accounting.commands['0'] }}
-aaa accounting commands 15 vty start-stop {{ host.config_context.aaa.accounting.commands['15'] }}
+aaa authorization auth-proxy default group radius
+aaa accounting delay-start all
+aaa accounting auth-proxy default start-stop group radius
+aaa accounting dot1x default start-stop group radius
+aaa accounting exec vty start-stop group tacacs+
+aaa accounting commands 0 vty start-stop group tacacs+
+aaa accounting commands 15 vty start-stop group tacacs+
+aaa accounting network default start-stop group radius
 {% for server in host.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
  address ipv4 {{ server.ip_address }}
- key <TACACS_KEY>
+ key {{ server.key | default('<TACACS_KEY>') }}
 {% endfor %}
 
 ! SNMP Configuration
 snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
 snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
-snmp-server location "{{ host.location.name }}"
+snmp-server location "{{ host.location.name }} - {{ host.config_context.site_pedc.snmp.location }}"
 {% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community <SNMP_COMMUNITY> {{ comm.permission }} {{ comm.timeout }}
+snmp-server community {{ comm.name }} {{ comm.permission }} {{ comm.timeout }}
 {% endfor %}
 {% for acl_number in ['51', '60'] %}
   {% set acl_key = 'acl_' ~ acl_number %}
@@ -83,7 +98,7 @@ ip access-list standard {{ acl_number }}
 snmp-server enable traps {{ trap }}
 {% endfor %}
 {% for host_ip in host.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ host_ip.ip }} <SNMP_COMMUNITY>
+snmp-server host {{ host_ip.ip }} version 2c {{ host_ip.community }}
 {% endfor %}
 
 ! NTP and Logging
@@ -93,22 +108,53 @@ logging host {{ host.config_context.syslog.logging_host }}
 
 ! Line Configurations
 line con 0
- {{ host.config_context.line_configs.console }}
+ exec-timeout 0 0
+ logging synchronous
+ login authentication console
+ stopbits 1
 line vty 0 4
- {{ host.config_context.line_configs.vty }}
+ transport input ssh
+ exec-timeout 15 0
  access-class 51 in
+ accounting commands 0 vty
+ accounting commands 15 vty
+ accounting exec vty
+ logging synchronous
+ length 0
+ transport preferred none
  transport input ssh
  transport output ssh
+line vty 5 15
+ transport input ssh
+ exec-timeout 15 0
+ access-class 51 in
+ accounting commands 0 vty
+ accounting commands 15 vty
+ accounting exec vty
+ logging synchronous
+ length 0
+ transport preferred none
+ transport input ssh
+ transport output ssh
+line vty 16 31
+ transport input ssh
 
 ! Banner
-banner motd ^C
+banner login ^CCC
 {{ host.config_context.data.banner_motd }}
 ^C
 
 ! IP Settings
+ip default-gateway {{ host.config_context.site_pedc.default_gateway }}
 ip http server
+ip http authentication local
 ip http secure-server
 ip http client source-interface {{ host.config_context.syslog.source_interface }}
+ip forward-protocol nd
 ip tacacs source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh version 2
+{% for dns in host.config_context.dns %}
+{{ dns }}
+{% endfor %}
+ip domain lookup source-interface {{ host.config_context.syslog.source_interface }}
