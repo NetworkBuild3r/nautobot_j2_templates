@@ -1,24 +1,21 @@
-{# ---------- AAA Configuration ---------- #}
+! AAA Configuration
 aaa new-model
-! AAA Authentication
-aaa authentication login default  {{ host.config_context.aaa.authentication.login.default }}
-aaa authentication login console  {{ host.config_context.aaa.authentication.login.console }}
+aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
+aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
 aaa authentication enable default {{ host.config_context.aaa.authentication.enable }}
-aaa authentication dot1x default  {{ host.config_context.aaa.authentication.dot1x }}
-
-! AAA Authorization
-aaa authorization exec    default {{ host.config_context.aaa.authorization.exec }}
+aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
+aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}
 aaa authorization network default {{ host.config_context.aaa.authorization.network }}
-
-! AAA Accounting
-aaa accounting exec           vty start-stop {{ host.config_context.aaa.accounting.exec }}
-aaa accounting commands 0  vty start-stop {{ host.config_context.aaa.accounting.commands['0'] }}
-aaa accounting commands 15 vty start-stop {{ host.config_context.aaa.accounting.commands['15'] }}
-
-{# ---------- TACACS+ Servers (safe lookup) ---------- #}
-{% set tacs = host.config_context['aaa'].get('tacacs_servers', []) %} {# use .get() for safety :contentReference[oaicite:1]{index=1} #}
-{% for tac in tacs %}
-tacacs server {{ tac.name }}
- address ipv4 {{ tac.ip_address }}
- key {% raw %}{{ secrets_group['Device-Creds'] | get_secret_by_secret_group_name(tac.key) }}{% endraw %}
+aaa authorization auth-proxy default group radius
+aaa accounting delay-start all
+aaa accounting auth-proxy default start-stop group radius
+aaa accounting dot1x default start-stop group radius
+aaa accounting exec vty start-stop group tacacs+
+aaa accounting commands 0 vty start-stop group tacacs+
+aaa accounting commands 15 vty start-stop group tacacs+
+aaa accounting network default start-stop group radius
+{% for server in host.config_context.aaa.tacacs_servers %}
+tacacs server {{ server.name }}
+ address ipv4 {{ server.ip_address }}
+ key {{ server.key | default('<TACACS_KEY>') }}
 {% endfor %}

@@ -1,0 +1,16 @@
+! VLAN Configurations
+{% set vlans = [] %}
+{% for intf in host.interfaces %}
+  {% if intf.untagged_vlan and intf.untagged_vlan not in vlans %}
+    {% set _ = vlans.append(intf.untagged_vlan) %}
+  {% endif %}
+  {% for vlan in intf.tagged_vlans %}
+    {% if vlan not in vlans %}
+      {% set _ = vlans.append(vlan) %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+{% for vlan in vlans | unique(attribute='vid') | sort(attribute='vid') %}
+vlan {{ vlan.vid }}
+ name {{ vlan.name }}
+{% endfor %}

@@ -1,9 +1,4 @@
-{% if host.config_context.data.banner_motd is defined %}
-banner motd ^CCC
+! Banner
+banner login ^CCC
 {{ host.config_context.data.banner_motd }}
 ^C
-{% else %}
-banner login ^C
-Authorized Access Only
-^C
-{% endif %}

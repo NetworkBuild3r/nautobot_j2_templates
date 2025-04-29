@@ -1,10 +1,8 @@
-{# VRF definitions (before interfaces) #}
-{% if host.vrfs %}
+! VRF Definitions
 {% for vrf in host.vrfs %}
 vrf definition {{ vrf.name }}
-  address-family ipv4
-    exit-address-family
-  address-family ipv6
-    exit-address-family
+ address-family ipv4
+  exit-address-family
+ address-family ipv6
+  exit-address-family
 {% endfor %}
-{% endif %}

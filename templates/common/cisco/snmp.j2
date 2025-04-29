@@ -1,0 +1,22 @@
+! SNMP Configuration
+snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
+snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
+snmp-server location "{{ host.location.name }} - {{ host.config_context.site_pedc.snmp.location }}"
+{% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
+snmp-server community {{ comm.name }} {{ comm.permission }} {{ comm.timeout }}
+{% endfor %}
+{% for acl_number in ['51', '60'] %}
+  {% set acl_key = 'acl_' ~ acl_number %}
+  {% if acl_key in host.config_context.cisco_snmp_ios.snmp %}
+ip access-list standard {{ acl_number }}
+    {% for rule in host.config_context.cisco_snmp_ios.snmp[acl_key] %}
+    {{ rule }}
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+{% for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}
+snmp-server enable traps {{ trap }}
+{% endfor %}
+{% for host_ip in host.config_context.cisco_snmp_ios.snmp.hosts %}
+snmp-server host {{ host_ip.ip }} version 2c {{ host_ip.community }}
+{% endfor %}

@@ -1,0 +1,4 @@
+! NTP and Logging
+ntp server {{ host.config_context.ntp.servers[0] }}
+logging source-interface {{ host.config_context.syslog.source_interface }}
+logging host {{ host.config_context.syslog.logging_host }}
