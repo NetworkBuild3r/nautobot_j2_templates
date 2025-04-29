@@ -27,9 +27,13 @@ interface {{ intf.name }}
   {% elif intf.untagged_vlan %}
     switchport mode access
     switchport access vlan {{ intf.untagged_vlan.vid }}
-    {% if host.role.name | lower == 'access' and intf.untagged_vlan.vid != 1000 %}
-    switchport voice vlan {{ host.config_context.access_switch_defaults.interface_defaults.voice_vlan }}
+    {% if host.config_context.get('access_switch_defaults', {}).get('interface_defaults', {}).get('voice_vlan') %}
+    switchport voice vlan {{ host.config_context['access_switch_defaults']['interface_defaults']['voice_vlan'] }}
+    {% endif %}
+    {% if host.config_context.get('access_switch_defaults', {}).get('interface_defaults', {}).get('spanning_tree_portfast') %}
     spanning-tree portfast
+    {% endif %}
+    {% if host.config_context.get('access_switch_defaults', {}).get('interface_defaults', {}).get('bpduguard') %}
     spanning-tree bpduguard enable
     {% endif %}
   {% endif %}
