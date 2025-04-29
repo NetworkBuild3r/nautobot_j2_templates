@@ -5,28 +5,6 @@
 {% include 'common/cisco/spanning_tree.j2' %}
 {% include 'common/cisco/interfaces.j2' %}
 
-
-! Port-Channel Configurations
-{% for intf in host.interfaces if intf.name.startswith('Port-channel') %}
-interface {{ intf.name }}
-  description {{ intf.description | default('Port-Channel Interface') }}
-  switchport mode trunk
-  switchport trunk allowed vlan all
-  {% if intf.untagged_vlan %}
-  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-  {% endif %}
-  no shutdown
-{% endfor %}
-
-! Port-Channel Configurations
-{% for intf in host.interfaces if intf.name.startswith('Port-channel') %}
-interface {{ intf.name }}
-  description {{ intf.description }}
-  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-  switchport mode trunk
-  no shutdown
-{% endfor %}
-
 ! AAA Configuration
 aaa new-model
 aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
