@@ -1,4 +1,3 @@
-! SNMP Configuration
 snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
 snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
 snmp-server location "{{ host.location.name }} - {{ host.config_context.site_pedc.snmp.location }}"

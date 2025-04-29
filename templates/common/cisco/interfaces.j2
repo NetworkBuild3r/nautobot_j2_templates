@@ -1,26 +1,39 @@
-{% for interface in host.interfaces %}
-interface {{ interface.name }}
-  {%- if interface.tagged_vlans %}
+!
+{% for intf in host.interfaces %}
+interface {{ intf.name }}
+  {% if intf.description %}
+  description {{ intf.description }}
+  {% endif %}
+  {% if intf.ip_addresses %}
+  ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
+  {% endif %}
+  {% if intf.vrf %}
+  vrf forwarding {{ intf.vrf.name }}
+  ip address dhcp
+  negotiation auto
+  {% endif %}
+  {% if intf.tagged_vlans or 'Uplink' in intf.description or intf.cable %}
   switchport mode trunk
-  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
-  {%- elif interface.untagged_vlan %}
+  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') if intf.tagged_vlans else 'all' }}
+  {% if intf.untagged_vlan %}
+  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+  {% endif %}
+  {% elif intf.untagged_vlan %}
   switchport mode access
-  switchport access vlan {{ interface.untagged_vlan.vid }}
-  {# Add access-specific commands if role is Access #}
-  {% if host.role.name | lower == 'access' %}
+  switchport access vlan {{ intf.untagged_vlan.vid }}
+  {% if host.role.name | lower == 'access' and intf.untagged_vlan.vid != 1000 %}
+  switchport voice vlan {{ host.config_context.access_switch_defaults.interface_defaults.voice_vlan }}
   spanning-tree portfast
   spanning-tree bpduguard enable
   {% endif %}
-  {%- endif %}
-  {%- if interface.description %}
-  description {{ interface.description }}
-  {%- endif %}
-  {%- for addr in interface.ip_addresses %}
-  ip address {{ addr.address.split('/')[0] }} {{ addr.address.split('/')[1] | int | cidr_to_netmask }}
-  {%- endfor %}
-  {%- if interface.enabled | default(false) %}
+  {% endif %}
+  {% if 'PO' in intf.description %}
+  {% set po_number = intf.description | regex_search('PO(\d+)') | first | default('102') %}
+  channel-group {{ po_number }} mode active
+  {% endif %}
+  {% if intf.enabled %}
   no shutdown
-  {%- else %}
+  {% else %}
   shutdown
-  {%- endif %}
+  {% endif %}
 {% endfor %}

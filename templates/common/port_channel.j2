@@ -1,0 +1,7 @@
+{% for intf in host.interfaces if intf.name.startswith('Port-channel') %}
+interface {{ intf.name }}
+  description {{ intf.description }}
+  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+  switchport mode trunk
+  no shutdown
+{% endfor %}

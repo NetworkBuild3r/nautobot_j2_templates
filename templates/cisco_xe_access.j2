@@ -1,50 +1,21 @@
 {%- include 'common/cisco/global_settings.j2' -%}
 {%- include 'common/cisco/vrfs.j2' -%}
 {%- include 'common/cisco/vlans.j2' -%}
+{%- include 'common/cisco/spanning_tree.j2' -%}
+{% include 'common/cisco/spanning_tree.j2' %}
+{% include 'common/cisco/interfaces.j2' %}
 
-! Spanning-Tree Configuration
-spanning-tree mode mst
-spanning-tree extend system-id
-spanning-tree vlan 1-4094 priority 61440
-spanning-tree mst 0 priority 61440
 
-! Interface Configurations
-{% for intf in host.interfaces %}
+! Port-Channel Configurations
+{% for intf in host.interfaces if intf.name.startswith('Port-channel') %}
 interface {{ intf.name }}
-  {% if intf.description %}
-  description {{ intf.description }}
-  {% endif %}
-  {% if intf.name.startswith('Vlan') and intf.ip_addresses %}
-  ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
-  {% endif %}
-  {% if intf.vrf %}
-  vrf forwarding {{ intf.vrf.name }}
-  ip address dhcp
-  negotiation auto
-  {% endif %}
-  {% if intf.tagged_vlans or 'Uplink' in intf.description %}
+  description {{ intf.description | default('Port-Channel Interface') }}
   switchport mode trunk
-  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') if intf.tagged_vlans else 'all' }}
+  switchport trunk allowed vlan all
   {% if intf.untagged_vlan %}
   switchport trunk native vlan {{ intf.untagged_vlan.vid }}
   {% endif %}
-  {% elif intf.untagged_vlan %}
-  switchport mode access
-  switchport access vlan {{ intf.untagged_vlan.vid }}
-  {% if intf.untagged_vlan.vid != 1000 and not intf.name.startswith('Vlan') %}
-  switchport voice vlan {{ host.config_context.access_switch_defaults.interface_defaults.voice_vlan }}
-  spanning-tree portfast
-  spanning-tree bpduguard enable
-  {% endif %}
-  {% endif %}
-  {% if intf.name.startswith('TenGigabitEthernet') and 'PO102' in intf.description %}
-  channel-group 102 mode active
-  {% endif %}
-  {% if intf.enabled %}
   no shutdown
-  {% else %}
-  shutdown
-  {% endif %}
 {% endfor %}
 
 ! Port-Channel Configurations

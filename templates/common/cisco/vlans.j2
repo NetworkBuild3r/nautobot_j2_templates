@@ -10,6 +10,7 @@
     {% endif %}
   {% endfor %}
 {% endfor %}
+!
 {% for vlan in vlans | unique(attribute='vid') | sort(attribute='vid') %}
 vlan {{ vlan.vid }}
  name {{ vlan.name }}

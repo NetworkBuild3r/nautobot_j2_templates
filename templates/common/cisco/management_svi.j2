@@ -1,0 +1,7 @@
+{% if host.config_context.mgmt is defined %}
+interface Vlan{{ host.config_context.mgmt.vlan | default('1000') }}
+  ip address {{ host.config_context.mgmt.ip }}
+  no shutdown
+{% else %}
+! Management SVI not configured (mgmt not defined in config_context)
+{% endif %}
