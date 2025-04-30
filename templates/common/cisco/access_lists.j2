@@ -1,14 +1,15 @@
-{% if 'cisco_snmp_ios' in host.config_context and 'snmp' in host.config_context.cisco_snmp_ios %}
- {% if 'acl_51' in host.config_context.cisco_snmp_ios.snmp %}
+{% if host.config_context.cisco_snmp_ios is defined and host.config_context.cisco_snmp_ios.snmp is defined %}
+! SNMP ACLs
+{% if host.config_context.cisco_snmp_ios.snmp.acl_51 %}
 ip access-list standard 51
- {% for rule in host.config_context.cisco_snmp_ios.snmp.acl_51 %}
- {{ rule }}
- {% endfor %}
- {% endif %}
- {% if 'acl_60' in host.config_context.cisco_snmp_ios.snmp %}
+{% for rule in host.config_context.cisco_snmp_ios.snmp.acl_51 %}
+  {{ rule.sequence }} {{ rule.text }}
+{% endfor %}
+{% endif %}
+{% if host.config_context.cisco_snmp_ios.snmp.acl_60 %}
 ip access-list standard 60
- {% for rule in host.config_context.cisco_snmp_ios.snmp.acl_60 %}
- {{ rule }}
- {% endfor %}
- {% endif %}
+{% for rule in host.config_context.cisco_snmp_ios.snmp.acl_60 %}
+  {{ rule.sequence }} {{ rule.text }}
+{% endfor %}
+{% endif %}
 {% endif %}

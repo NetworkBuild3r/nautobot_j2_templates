@@ -1,11 +1,17 @@
+!
 aaa new-model
+aaa server radius dynamic-author
+aaa session-id common
+
 aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
 aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
 aaa authentication enable default {{ host.config_context.aaa.authentication.enable }}
 aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
-aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}
+
+aaa authorization exec default {{ host.config_context.aaa.authorization.exec }} if-authenticated
 aaa authorization network default {{ host.config_context.aaa.authorization.network }}
 aaa authorization auth-proxy default group radius
+
 aaa accounting delay-start all
 aaa accounting auth-proxy default start-stop group radius
 aaa accounting dot1x default start-stop group radius
@@ -13,9 +19,13 @@ aaa accounting exec vty start-stop group tacacs+
 aaa accounting commands 0 vty start-stop group tacacs+
 aaa accounting commands 15 vty start-stop group tacacs+
 aaa accounting network default start-stop group radius
+
 {% for server in host.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
- address ipv4 {{ server.ip_address }}
- key {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", "tacacs server") | first | get_secret_by_secret_group_name(server.name | lower | replace("-", "_") ~ "_key") | default("<TACACS_KEY>") }}{% endraw %}
-
+  address ipv4 {{ server.ip_address }}
+  key {{ host.config_context.secrets_groups
+            | selectattr("name","equalto","tacacs server")
+            | first
+            | get_secret_by_secret_group_name(server.name|lower|replace("-","_")~"_key")
+            | default("<TACACS_KEY>") }}
 {% endfor %}

@@ -1,3 +1,19 @@
-{% if 'crypto' in host.config_context %}
-{{ host.config_context.crypto }}
+{% if host.config_context.crypto.trustpoints %}
+! Crypto PKI Trustpoints & Certificates
+{% for tp in host.config_context.crypto.trustpoints %}
+crypto pki trustpoint {{ tp.name }}
+  enrollment {{ tp.enrollment }}
+  {% if tp.subject_name %}subject-name {{ tp.subject_name }}{% endif %}
+  {% if tp.revocation_check is defined and not tp.revocation_check %}revocation-check none{% endif %}
+  {% if tp.rsakeypair %}rsakeypair {{ tp.rsakeypair }}{% endif %}
+
+{% if tp.cert_chain %}
+crypto pki certificate chain {{ tp.name }}
+{% for cert in tp.cert_chain %}
+ certificate {{ cert.type }} {{ cert.index }}
+  {{ cert.data }}
+{% endfor %}
+
+{% endif %}
+{% endfor %}
 {% endif %}

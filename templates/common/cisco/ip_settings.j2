@@ -1,5 +1,9 @@
 !
 ip default-gateway {{ host.config_context.site_pedc.default_gateway }}
+
+ip name-server {{ host.config_context.dns_servers[0] }} vrf Mgmt-vrf
+ip name-server {{ host.config_context.dns_servers[1] }} vrf Mgmt-vrf
+
 ip http server
 ip http authentication local
 ip http secure-server
@@ -8,8 +12,10 @@ ip forward-protocol nd
 ip tacacs source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh version 2
-{% for dns in host.config_context.dns %}
-  {{ dns }}
+
+{% for server in host.config_context.dns_servers[2:] %}
+dns server {{ server }}
 {% endfor %}
+
 ip domain lookup source-interface {{ host.config_context.syslog.source_interface }}
-!
+ip domain name {{ host.config_context.domain_name }}
