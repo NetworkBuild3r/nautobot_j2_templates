@@ -1,3 +1,4 @@
+!
 ip default-gateway {{ host.config_context.site_pedc.default_gateway }}
 ip http server
 ip http authentication local
@@ -8,6 +9,7 @@ ip tacacs source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh source-interface {{ host.config_context.syslog.source_interface }}
 ip ssh version 2
 {% for dns in host.config_context.dns %}
-{{ dns }}
+  {{ dns }}
 {% endfor %}
 ip domain lookup source-interface {{ host.config_context.syslog.source_interface }}
+!

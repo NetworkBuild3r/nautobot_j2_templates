@@ -1,31 +1,34 @@
+!
+! Line Configurations
 line con 0
- exec-timeout 0 0
- logging synchronous
- login authentication console
- stopbits 1
+  exec-timeout 0 0
+  logging synchronous
+  login authentication console
+  stopbits 1
 line vty 0 4
- transport input ssh
- exec-timeout 15 0
- access-class 51 in
- accounting commands 0 vty
- accounting commands 15 vty
- accounting exec vty
- logging synchronous
- length 0
- transport preferred none
- transport input ssh
- transport output ssh
+  transport input ssh
+  exec-timeout 15 0
+  access-class 51 in
+  accounting commands 0 vty
+  accounting commands 15 vty
+  accounting exec vty
+  logging synchronous
+  length 0
+  transport preferred none
+  transport input ssh
+  transport output ssh
 line vty 5 15
- transport input ssh
- exec-timeout 15 0
- access-class 51 in
- accounting commands 0 vty
- accounting commands 15 vty
- accounting exec vty
- logging synchronous
- length 0
- transport preferred none
- transport input ssh
- transport output ssh
+  transport input ssh
+  exec-timeout 15 0
+  access-class 51 in
+  accounting commands 0 vty
+  accounting commands 15 vty
+  accounting exec vty
+  logging synchronous
+  length 0
+  transport preferred none
+  transport input ssh
+  transport output ssh
 line vty 16 31
- transport input ssh
+  transport input ssh
+!

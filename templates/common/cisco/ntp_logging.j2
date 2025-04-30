@@ -1,3 +1,7 @@
-ntp server {{ host.config_context.ntp.servers[0] }}
+!
+{% for server in host.config_context.ntp.servers %}
+ntp server {{ server }}
+{% endfor %}
 logging source-interface {{ host.config_context.syslog.source_interface }}
 logging host {{ host.config_context.syslog.logging_host }}
+!
