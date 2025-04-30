@@ -1,13 +1,16 @@
 !
-{% set vlans = host.config_context.vlans | default([]) %}
-{% if host.config_context.access_switch_defaults.interface_defaults.voice_vlan %}
-  {% set _ = vlans.append({
-    "vid": host.config_context.access_switch_defaults.interface_defaults.voice_vlan,
-    "name": host.config_context.access_switch_defaults.interface_defaults.voice_name | default("VOICE")
-  }) %}
-{% endif %}
-
-{% for vlan in vlans | unique(attribute="vid") | sort(attribute="vid") %}
+{% set vlans = [] %}
+{% for intf in host.interfaces %}
+  {% if intf.untagged_vlan and intf.untagged_vlan not in vlans %}
+    {% set _ = vlans.append(intf.untagged_vlan) %}
+  {% endif %}
+  {% for vlan in intf.tagged_vlans %}
+    {% if vlan not in vlans %}
+      {% set _ = vlans.append(vlan) %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+{% for vlan in vlans | unique(attribute='vid') | sort(attribute='vid') %}
 vlan {{ vlan.vid }}
   name {{ vlan.name }}
 {% endfor %}
