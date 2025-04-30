@@ -1,9 +1,16 @@
 !
+version {{ host.config_context.ios_version | default("17.9") }}
+platform punt-keepalive disable-kernel-core
+
 hostname {{ host.name }}
 service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
 service call-home
+
+{% if host.config_context.enable_secret %}
+enable secret {{ host.config_context.enable_secret }}
+{% else %}
 {% if 'enable_secret' in host.config_context %}
 enable secret {{ host.config_context.enable_secret }}
 {% else %}
