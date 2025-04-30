@@ -1,17 +1,17 @@
-!
 {% for intf in host.interfaces %}
 interface {{ intf.name }}
 {% if intf.description %}
   description {{ intf.description | trim }}
 {% endif %}
-{% if intf.ip_addresses %}
-  ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
-{% endif %}
 {% if intf.vrf %}
   vrf forwarding {{ intf.vrf.name }}
+{% endif %}
+{% if intf.ip_addresses %}
+  ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
+{% elif intf.vrf and not intf.ip_addresses %}
   ip address dhcp
-  negotiation auto
-{% else %}
+{% endif %}
+{% if not intf.vrf and not intf.ip_addresses and (intf.tagged_vlans or intf.untagged_vlan) %}
   {% if intf.name.startswith('Port-channel') %}
     switchport mode trunk
     switchport trunk allowed vlan all
@@ -41,6 +41,9 @@ interface {{ intf.name }}
 {% if 'PO' in intf.description %}
 {% set po_number = intf.description | regex_search('PO(\d+)') | first | default('102') %}
   channel-group {{ po_number }} mode active
+{% endif %}
+{% if intf.name.startswith('GigabitEthernet') or intf.name.startswith('TenGigabitEthernet') %}
+  negotiation auto
 {% endif %}
 {% if intf.enabled %}
   no shutdown
