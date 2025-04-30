@@ -1,3 +1,4 @@
+!
 {% set vlans = [] %}
 {% for intf in host.interfaces %}
   {% if intf.untagged_vlan and intf.untagged_vlan not in vlans %}
@@ -13,3 +14,4 @@
 vlan {{ vlan.vid }}
   name {{ vlan.name }}
 {% endfor %}
+!

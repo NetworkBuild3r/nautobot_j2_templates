@@ -16,5 +16,6 @@ aaa accounting network default start-stop group radius
 {% for server in host.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
  address ipv4 {{ server.ip_address }}
- key {{ server.key | default('<TACACS_KEY>') }}
+ key {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", "tacacs server") | first | get_secret_by_secret_group_name(server.name | lower | replace("-", "_") ~ "_key") | default("<TACACS_KEY>") }}{% endraw %}
+
 {% endfor %}

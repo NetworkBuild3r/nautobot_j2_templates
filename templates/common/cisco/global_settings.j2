@@ -1,10 +1,14 @@
-! Global Settings
+!
 hostname {{ host.name }}
 service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
 service call-home
-enable secret {{ host.config_context.security_defaults.enable_secret | default('<ENABLE_SECRET>') }}
+{% if 'enable_secret' in host.config_context %}
+enable secret {{ host.config_context.enable_secret }}
+{% else %}
+enable secret {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", "enable secret") | first | get_secret_by_secret_group_name("enable_secret") | default("<ENABLE_SECRET>") }}{% endraw %}
+{% endif %}
 logging console warnings
 vtp mode off
 lldp run

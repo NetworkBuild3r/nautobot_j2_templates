@@ -1,0 +1,5 @@
+{% if 'users' in host.config_context %}
+{% for user in host.config_context.users %}
+username {{ user.name }} secret {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", "local user") | first | get_secret_by_secret_group_name(user.secret_name) | default("<USER_SECRET>") }}{% endraw %}
+{% endfor %}
+{% endif %}
