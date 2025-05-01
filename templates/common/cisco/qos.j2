@@ -1,0 +1,10 @@
+{% if host.config_context.qos.class_maps is defined and host.config_context.qos.class_maps | length %}
+!  — QoS Class-maps (system-cpp policies)
+{% for cm in host.config_context.qos.class_maps %}
+class-map match-any {{ cm.name }}
+{%   if cm.description is defined and cm.description %}
+  description {{ cm.description }}
+{%   endif %}
+{% endfor %}
+
+{% endif %}

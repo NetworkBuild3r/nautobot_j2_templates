@@ -1,36 +1,37 @@
-!
-{% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {{
-    comm.secret_group is defined and comm.secret_name is defined
-    and (host.config_context.secrets_groups
-           | selectattr("name","equalto",comm.secret_group)
-           | first
-           | get_secret_by_secret_group_name(comm.secret_name))
-    or comm.name
-}} {{ comm.permission }} {{ comm.timeout }}
+! SNMP
+! SNMP Community Strings:
+{% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}
+snmp-server community {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", comm['secret_group']) | first | get_secret_by_secret_group_name(comm['secret_name']) | default("<SNMP_COMMUNITY>") }}{% endraw %} {{ comm['permission'] }} {{ comm['timeout'] }}
 {% endfor %}
 
-snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
-snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
+! SNMP Trap Source, Contact, and Location:
+snmp-server trap-source {{ host.config_context['cisco_snmp_ios']['snmp']['trap_source'] }}
+snmp-server contact "{{ host.config_context['cisco_snmp_ios']['snmp']['contact'] }}"
 
-{% for acl in ['51','60'] %}
-ip access-list standard {{ acl }}
-{% for rule in host.config_context.cisco_snmp_ios.snmp['acl_' + acl] %}
-  {{ rule.sequence }} {{ rule.text }}
-{% endfor %}
+{# Build SNMP location dynamically from location, rack-group, and rack #}
+{% set rack = host.get('rack') %}
+{% set loc  = host.location.name if host.location is mapping else host.location %}
+{% set rack_group = rack.rack_group.name if rack and rack.rack_group else '' %}
+{% set rack_name  = rack.name if rack else '' %}
+snmp-server location {{ loc }}{% if rack_group %} {{ rack_group }}{% endif %}{% if rack_name %} Rack {{ rack_name }}{% endif %}
+
+{# ACLs for SNMP #}
+{% for acl_number in ['51', '60'] %}
+  {% set acl_key = 'acl_' ~ acl_number %}
+  {% if acl_key in host.config_context['cisco_snmp_ios']['snmp'] %}
+ip access-list standard {{ acl_number }}
+  {% for rule in host.config_context['cisco_snmp_ios']['snmp'][acl_key] %}
+    {{ rule }}
+  {% endfor %}
+  {% endif %}
 {% endfor %}
 
-{% for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}
+! Enabled SNMP Traps:
+{% for trap in host.config_context['cisco_snmp_ios']['snmp']['enable_traps'] %}
 snmp-server enable traps {{ trap }}
 {% endfor %}
 
-{% for entry in host.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ entry.ip }} version {{ entry.version }} {{
-    entry.secret_group is defined and entry.secret_name is defined
-    and (host.config_context.secrets_groups
-           | selectattr("name","equalto",entry.secret_group)
-           | first
-           | get_secret_by_secret_group_name(entry.secret_name))
-    or entry.community
-}}
+! SNMP Host Entries:
+{% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] %}
+snmp-server host {{ entry['ip'] }} {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", entry['secret_group']) | first | get_secret_by_secret_group_name(entry['secret_name']) | default("<SNMP_COMMUNITY>") }}{% endraw %}
 {% endfor %}
