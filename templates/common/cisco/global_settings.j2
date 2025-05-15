@@ -1,9 +1,9 @@
 !
-hostname {{ host.name }}
 service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
 service call-home
+hostname {{ host.name }}
 {% if 'enable_secret' in host.config_context %}
 enable secret {{ host.config_context.enable_secret }}
 {% else %}
