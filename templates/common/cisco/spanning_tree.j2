@@ -1,3 +1,5 @@
+!
+! Debug: STP mode from config_context: {{ host.config_context.stp.mode | default('undefined') }}
 spanning-tree mode {{ host.config_context.stp.mode | default('mst') }}
 spanning-tree extend system-id
 spanning-tree vlan 1-4094 priority {{ host.config_context.stp.priority | default('61440') }}
@@ -8,3 +10,4 @@ errdisable recovery cause udld
 errdisable recovery cause bpduguard
 errdisable recovery cause storm-control
 errdisable recovery interval 900
+!
