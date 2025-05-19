@@ -1,14 +1,14 @@
 !
-{% for intf in device.interfaces %}
+{% for intf in interfaces %}
 interface {{ intf.name }}
 {% if intf.description %}
-  description {{ intf.description }}
+ description {{ intf.description }}
 {% endif %}
 {% if intf.ip_addresses %}
-  ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
+ ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
 {% endif %}
 {% if intf.mode %}
-  {% if intf.mode == 'ACCESS' %}
+ {% if intf.mode == 'ACCESS' %}
   switchport mode access
   {% if intf.untagged_vlan %}
   switchport access vlan {{ intf.untagged_vlan.vid }}
@@ -28,8 +28,9 @@ interface {{ intf.name }}
   {% if intf._custom_field_data.storm_control_level %}
   storm-control broadcast level {{ intf._custom_field_data.storm_control_level }}
   {% endif %}
-  {% elif intf.mode == 'TAGGED_ALL' %}
+ {% elif intf.mode == 'TAGGED_ALL' %}
   switchport mode trunk
+  switchport nonegotiate
   {% if intf.untagged_vlan %}
   switchport trunk native vlan {{ intf.untagged_vlan.vid }}
   {% endif %}
@@ -37,22 +38,22 @@ interface {{ intf.name }}
   {% if intf._custom_field_data.storm_control_level %}
   storm-control broadcast level {{ intf._custom_field_data.storm_control_level }}
   {% endif %}
-  {% if intf._custom_field_data.storm_control_action %}
+  {% if intf._custom_field_data.storm_control_action and intf._custom_field_data.storm_control_action != 'drop' %}
   storm-control action {{ intf._custom_field_data.storm_control_action }}
   {% endif %}
   {% if intf._custom_field_data.dhcp_snooping_trust %}
   ip dhcp snooping trust
   {% endif %}
-  {% endif %}
+ {% endif %}
 {% endif %}
 {% if intf.lag %}
-  {% set channel_number = intf.lag.name | regex_replace('^Port-Channel(\\d+)$', '\\1') %}
-  channel-group {{ channel_number }} mode active
+ {% set channel_number = intf.lag.name | regex_replace('^Port-Channel(\\d+)$', '\\1') %}
+ channel-group {{ channel_number }} mode active
 {% endif %}
 {% if intf.enabled %}
-  no shutdown
+ no shutdown
 {% else %}
-  shutdown
+ shutdown
 {% endif %}
-
+!
 {% endfor %}
