@@ -1,34 +1,30 @@
 !
+ip access-list standard VTY_ACCESS_ACL	
+ 10 permit 10.0.0.0 0.255.255.255	
+ 20 permit 192.168.0.0 0.0.255.255	
+ 30 deny   any log	
+!
 ! Line Configurations
 line con 0
-  exec-timeout 0 0
-  logging synchronous
-  login authentication console
-  stopbits 1
+ exec-timeout 15 0
+ logging synchronous
+ login authentication console
+ stopbits 1
 line vty 0 4
-  transport input ssh
-  exec-timeout 15 0
-  access-class 51 in
-  accounting commands 0 vty
-  accounting commands 15 vty
-  accounting exec vty
-  logging synchronous
-  length 0
-  transport preferred none
-  transport input ssh
-  transport output ssh
+ access-class VTY_ACCESS_ACL in
+ exec-timeout 15 0
+ accounting commands 0 vty
+ accounting commands 15 vty
+ accounting exec vty
+ logging synchronous
+ transport input ssh
 line vty 5 15
-  transport input ssh
-  exec-timeout 15 0
-  access-class 51 in
-  accounting commands 0 vty
-  accounting commands 15 vty
-  accounting exec vty
-  logging synchronous
-  length 0
-  transport preferred none
-  transport input ssh
-  transport output ssh
+ access-class VTY_ACCESS_ACL in
+ exec-timeout 15 0
+ accounting commands 0 vty
+ accounting commands 15 vty
+ accounting exec vty
+ logging synchronous
+ transport input ssh
 line vty 16 31
-  transport input ssh
-!
+ transport input ssh

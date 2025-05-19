@@ -1,52 +1,53 @@
 !
-{% for intf in host.interfaces %}
+{% for intf in device.interfaces %}
 interface {{ intf.name }}
 {% if intf.description %}
-  description {{ intf.description | trim }}
+  description {{ intf.description }}
 {% endif %}
-{% if intf.ip_addresses and intf.ip_addresses[0].address %}
+{% if intf.ip_addresses %}
   ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
 {% endif %}
-{% if intf.vrf and intf.vrf.name %}
-  vrf forwarding {{ intf.vrf.name }}
-  ip address dhcp
-  negotiation auto
-{% else %}
-  {% if intf.name.startswith('Port-channel') %}
-  switchport mode trunk
-  switchport trunk allowed vlan all
-  {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
-  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-  {% endif %}
-  {% elif 'PO' not in (intf.description | default('')) %}
-  {% if intf.tagged_vlans or 'Uplink' in (intf.description | default('')) or intf.cable %}
-  switchport mode trunk
-  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') if intf.tagged_vlans else 'all' }}
-  {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
-  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-  {% endif %}
-  {% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+{% if intf.mode %}
+  {% if intf.mode == 'ACCESS' %}
   switchport mode access
+  {% if intf.untagged_vlan %}
   switchport access vlan {{ intf.untagged_vlan.vid }}
-  {% if host.config_context.get('access_switch_defaults', {}).get('interface_defaults', {}).get('voice_vlan') %}
-  switchport voice vlan {{ host.config_context['access_switch_defaults']['interface_defaults']['voice_vlan'] }}
   {% endif %}
-  {% if host.config_context.get('access_switch_defaults', {}).get('interface_defaults', {}).get('spanning_tree_portfast') %}
+  {% if intf._custom_field_data.voice_vlan %}
+  switchport voice vlan {{ intf._custom_field_data.voice_vlan }}
+  {% endif %}
+  {% if intf._custom_field_data.portfast %}
   spanning-tree portfast
   {% endif %}
-  {% if host.config_context.get('access_switch_defaults', {}).get('interface_defaults', {}).get('bpduguard') %}
+  {% if intf._custom_field_data.bpduguard %}
   spanning-tree bpduguard enable
   {% endif %}
+  {% if intf._custom_field_data.dhcp_snooping_limit %}
+  ip dhcp snooping limit rate {{ intf._custom_field_data.dhcp_snooping_limit }}
+  {% endif %}
+  {% if intf._custom_field_data.storm_control_level %}
+  storm-control broadcast level {{ intf._custom_field_data.storm_control_level }}
+  {% endif %}
+  {% elif intf.mode == 'TAGGED_ALL' %}
+  switchport mode trunk
+  {% if intf.untagged_vlan %}
+  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+  {% endif %}
+  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') if intf.tagged_vlans else 'all' }}
+  {% if intf._custom_field_data.storm_control_level %}
+  storm-control broadcast level {{ intf._custom_field_data.storm_control_level }}
+  {% endif %}
+  {% if intf._custom_field_data.storm_control_action %}
+  storm-control action {{ intf._custom_field_data.storm_control_action }}
+  {% endif %}
+  {% if intf._custom_field_data.dhcp_snooping_trust %}
+  ip dhcp snooping trust
   {% endif %}
   {% endif %}
 {% endif %}
-{% if 'PO' in (intf.description | default('')) and not intf.name.startswith('Port-channel') %}
-  {% set po_match = intf.description | regex_search('PO(\d+)') %}
-  {% if po_match %}
-  channel-group {{ po_match[0] }} mode active
-  {% else %}
-  channel-group 102 mode active
-  {% endif %}
+{% if intf.lag %}
+  {% set channel_number = intf.lag.name | regex_replace('^Port-Channel(\\d+)$', '\\1') %}
+  channel-group {{ channel_number }} mode active
 {% endif %}
 {% if intf.enabled %}
   no shutdown
