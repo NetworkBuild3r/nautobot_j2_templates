@@ -2,24 +2,20 @@
   {{ intf.mode | default('') }}-{{ intf.untagged_vlan.vid | default('') }}-{{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') | default('') }}-{{ intf._custom_field_data.voice_vlan | default('') }}-{{ intf._custom_field_data.storm_control_level | default('') }}-{{ intf._custom_field_data.storm_control_action | default('') }}-{{ intf._custom_field_data.portfast | default('') }}-{{ intf._custom_field_data.bpduguard | default('') }}-{{ intf._custom_field_data.dhcp_snooping_limit | default('') }}-{{ intf._custom_field_data.dhcp_snooping_trust | default('') }}-{{ intf._custom_field_data.channel_group | default('') }}-{{ intf.enabled | default('') }}
 {% endmacro %}
 
-{% set interface_groups = [] %}
+{% set interface_groups = {} %}
 {% for intf in interfaces | sort(attribute='name') %}
-  {% set found = false %}
-  {% for group in interface_groups %}
-    {% if group.config == config_key(intf) %}
-      {% do group.interfaces.append(intf) %}
-      {% set found = true %}
-    {% endif %}
-  {% endfor %}
-  {% if not found %}
-    {% do interface_groups.append({'config': config_key(intf), 'interfaces': [intf]}) %}
+  {% set key = config_key(intf) %}
+  {% if key in interface_groups %}
+    {% set _ = interface_groups.update({key: interface_groups[key] + [intf]}) %}
+  {% else %}
+    {% set _ = interface_groups.update({key: [intf]}) %}
   {% endif %}
 {% endfor %}
 
-{% for group in interface_groups %}
-{% set interface_names = group.interfaces | map(attribute='name') | list %}
+{% for key, group_interfaces in interface_groups.items() %}
+{% set interface_names = group_interfaces | map(attribute='name') | list %}
 interface range {{ interface_names | interface_range_compress }}
-{% set intf = group.interfaces[0] %}
+{% set intf = group_interfaces[0] %}
 {% if intf.description %}
  description {{ intf.description }}
 {% endif %}
