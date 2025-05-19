@@ -1,59 +1,69 @@
-!
-{% for intf in interfaces %}
-interface {{ intf.name }}
+{% macro config_key(intf) %}
+  {{ intf.mode | default('') }}-{{ intf.untagged_vlan.vid | default('') }}-{{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') | default('') }}-{{ intf._custom_field_data.voice_vlan | default('') }}-{{ intf._custom_field_data.storm_control_level | default('') }}-{{ intf._custom_field_data.storm_control_action | default('') }}-{{ intf._custom_field_data.portfast | default('') }}-{{ intf._custom_field_data.bpduguard | default('') }}-{{ intf._custom_field_data.dhcp_snooping_limit | default('') }}-{{ intf._custom_field_data.dhcp_snooping_trust | default('') }}-{{ intf._custom_field_data.channel_group | default('') }}-{{ intf.enabled | default('') }}
+{% endmacro %}
+
+{% set interface_groups = [] %}
+{% for intf in interfaces | sort(attribute='name') %}
+  {% set found = false %}
+  {% for group in interface_groups %}
+    {% if group.config == config_key(intf) %}
+      {% do group.interfaces.append(intf) %}
+      {% set found = true %}
+    {% endif %}
+  {% endfor %}
+  {% if not found %}
+    {% do interface_groups.append({'config': config_key(intf), 'interfaces': [intf]}) %}
+  {% endif %}
+{% endfor %}
+
+{% for group in interface_groups %}
+{% set interface_names = group.interfaces | map(attribute='name') | list %}
+interface range {{ interface_names | interface_range_compress }}
+{% set intf = group.interfaces[0] %}
 {% if intf.description %}
  description {{ intf.description }}
 {% endif %}
 {% if intf.ip_addresses %}
  ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
 {% endif %}
-{% if intf.mode %}
- {% if intf.mode == 'ACCESS' %}
-  switchport mode access
-  {% if intf.untagged_vlan %}
-  switchport access vlan {{ intf.untagged_vlan.vid }}
-  {% endif %}
-  {% if intf._custom_field_data.voice_vlan %}
-  switchport voice vlan {{ intf._custom_field_data.voice_vlan }}
-  {% endif %}
-  {% if intf._custom_field_data.portfast %}
-  spanning-tree portfast
-  {% endif %}
-  {% if intf._custom_field_data.bpduguard %}
-  spanning-tree bpduguard enable
-  {% endif %}
-  {% if intf._custom_field_data.dhcp_snooping_limit %}
-  ip dhcp snooping limit rate {{ intf._custom_field_data.dhcp_snooping_limit }}
-  {% endif %}
-  {% if intf._custom_field_data.storm_control_level %}
-  storm-control broadcast level {{ intf._custom_field_data.storm_control_level }}
-  {% endif %}
- {% elif intf.mode == 'TAGGED_ALL' %}
-  switchport mode trunk
-  switchport nonegotiate
-  {% if intf.untagged_vlan %}
-  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-  {% endif %}
-  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | join(',') if intf.tagged_vlans else 'all' }}
-  {% if intf._custom_field_data.storm_control_level %}
-  storm-control broadcast level {{ intf._custom_field_data.storm_control_level }}
-  {% endif %}
-  {% if intf._custom_field_data.storm_control_action and intf._custom_field_data.storm_control_action != 'drop' %}
-  storm-control action {{ intf._custom_field_data.storm_control_action }}
-  {% endif %}
-  {% if intf._custom_field_data.dhcp_snooping_trust %}
-  ip dhcp snooping trust
-  {% endif %}
+{% if intf.mode == 'ACCESS' %}
+ switchport access vlan {{ intf.untagged_vlan.vid }}
+ switchport mode access
+ {% if intf._custom_field_data.voice_vlan %}
+ switchport voice vlan {{ intf._custom_field_data.voice_vlan }}
  {% endif %}
-{% endif %}
-{% if intf.lag %}
- {% set channel_number = intf.lag.name | regex_replace('^Port-Channel(\\d+)$', '\\1') %}
- channel-group {{ channel_number }} mode active
-{% endif %}
-{% if intf.enabled %}
- no shutdown
-{% else %}
+ {% if intf._custom_field_data.storm_control_level %}
+ storm-control broadcast level {{ intf._custom_field_data.storm_control_level }}
+ {% endif %}
+ {% if intf._custom_field_data.portfast %}
+ spanning-tree portfast
+ {% endif %}
+ {% if intf._custom_field_data.bpduguard %}
+ spanning-tree bpduguard enable
+ {% endif %}
+ {% if intf._custom_field_data.dhcp_snooping_limit %}
+ ip dhcp snooping limit rate {{ intf._custom_field_data.dhcp_snooping_limit }}
+ {% endif %}
+{% elif intf.mode == 'TAGGED_ALL' %}
+ switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+ switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
+ switchport mode trunk
+ switchport nonegotiate
+ {% if intf._custom_field_data.storm_control_level %}
+ storm-control broadcast level bps {{ intf._custom_field_data.storm_control_level }}
+ {% endif %}
+ {% if intf._custom_field_data.storm_control_action and intf._custom_field_data.storm_control_action != 'drop' %}
+ storm-control action {{ intf._custom_field_data.storm_control_action }}
+ {% endif %}
+ {% if intf._custom_field_data.channel_group %}
+ channel-group {{ intf._custom_field_data.channel_group }} mode active
+ {% endif %}
+ {% if intf._custom_field_data.dhcp_snooping_trust %}
+ ip dhcp snooping trust
+ {% endif %}
+ {% if not intf.enabled %}
  shutdown
+ {% endif %}
 {% endif %}
 !
 {% endfor %}
