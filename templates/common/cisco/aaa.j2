@@ -1,21 +1,78 @@
+{% if host.config_context.aaa.new_model | default(true) %}
 aaa new-model
-aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
-aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
-aaa authentication enable default {{ host.config_context.aaa.authentication.enable }}
-aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
-aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}
-aaa authorization network default {{ host.config_context.aaa.authorization.network }}
-aaa authorization auth-proxy default group radius
-aaa accounting delay-start all
-aaa accounting auth-proxy default start-stop group radius
-aaa accounting dot1x default start-stop group radius
-aaa accounting exec vty start-stop group tacacs+
-aaa accounting commands 0 vty start-stop group tacacs+
-aaa accounting commands 15 vty start-stop group tacacs+
-aaa accounting network default start-stop group radius
-{% for server in host.config_context.aaa.tacacs_servers %}
+{% endif %}
+
+{# Authentication #}
+{% if 'authentication' in host.config_context.aaa %}
+  {% for method, value in host.config_context.aaa.authentication.items() %}
+    {% if method == 'login' %}
+      {% for list_name, auth_method in value.items() %}
+aaa authentication login {{ list_name }} {{ auth_method }}
+      {% endfor %}
+    {% elif method in ['enable', 'dot1x', 'ppp'] %}
+aaa authentication {{ method }} default {{ value }}
+    {% elif method in ['banner', 'fail_message'] %}
+aaa authentication {{ method }} ^C{{ value }}^C
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{# Authorization #}
+{% if 'authorization' in host.config_context.aaa %}
+  {% for type, value in host.config_context.aaa.authorization.items() %}
+    {% if type in ['exec', 'network', 'config_commands', 'reverse_access', 'auth_proxy'] %}
+aaa authorization {{ type }} default {{ value }}
+    {% elif type == 'commands' %}
+      {% for level, group in value.items() %}
+aaa authorization commands {{ level }} default {{ group }}
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{# Accounting #}
+{% if 'accounting' in host.config_context.aaa %}
+  {% for type, value in host.config_context.aaa.accounting.items() %}
+    {% if type in ['exec', 'network', 'system', 'connection', 'dot1x'] %}
+aaa accounting {{ type }} default {{ value }}
+    {% elif type == 'commands' %}
+      {% for level, cmd_value in value.items() %}
+aaa accounting commands {{ level }} default {{ cmd_value }}
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{# Server Groups #}
+{% if 'server_groups' in host.config_context.aaa %}
+  {% for protocol, groups in host.config_context.aaa.server_groups.items() %}
+    {% for group_name, group_data in groups.items() %}
+aaa group server {{ protocol }} {{ group_name }}
+      {% for server in group_data.servers %}
+ server name {{ server.name }}
+      {% endfor %}
+    {% endfor %}
+  {% endfor %}
+{% endif %}
+
+{# TACACS+ Servers #}
+{% if 'tacacs_servers' in host.config_context.aaa %}
+  {% for server in host.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
  address ipv4 {{ server.ip_address }}
- key {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", "tacacs server") | first | get_secret_by_secret_group_name(server.name | lower | replace("-", "_") ~ "_key") | default("<TACACS_KEY>") }}{% endraw %}
+ key {% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name(server.name | lower | replace("-", "_") ~ "_key") | default("tacacs_key") }}{% endraw %}
+  {% endfor %}
+{% endif %}
 
-{% endfor %}
+{# Miscellaneous #}
+{% if 'misc' in host.config_context.aaa %}
+  {% if 'session_id' in host.config_context.aaa.misc %}
+aaa session-id {{ host.config_context.aaa.misc.session_id }}
+  {% endif %}
+  {% if 'update' in host.config_context.aaa.misc %}
+aaa accounting update {{ host.config_context.aaa.misc.update }}
+  {% endif %}
+  {% if 'deadtime' in host.config_context.aaa.misc %}
+tacacs-server deadtime {{ host.config_context.aaa.misc.deadtime }}
+  {% endif %}
+{% endif %}
