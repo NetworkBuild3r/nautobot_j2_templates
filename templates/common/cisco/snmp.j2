@@ -35,3 +35,22 @@ snmp-server enable traps {{ trap }}
 {% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] %}
 snmp-server host {{ entry['ip'] }} {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", entry['secret_group']) | first | get_secret_by_secret_group_name(entry['secret_name']) | default("<SNMP_COMMUNITY>") }}{% endraw %}
 {% endfor %}
+
+ip access-list standard SNMP_ACCESS_ACL
+ 10 remark "DNA Center"
+ 10 permit 10.9.126.84
+ 20 remark "DNA Center"
+ 20 permit 10.9.126.87
+ 30 remark "DNA Center"
+ 30 permit 10.9.126.81
+ 40 remark "DNA Center"
+ 40 permit 10.9.126.82
+ 50 remark "GBSA SevOne Pollers"
+ 50 permit 10.100.55.0 0.0.0.15
+ 60 remark "PEDC SevOne Pollers"
+ 60 permit 10.100.55.16 0.0.0.15
+ 70 remark "PEDC Cisco Prime"
+ 70 permit 10.1.100.111
+ 80 remark "SCA Cisco Prime"
+ 80 permit 10.9.64.22
+ 90 deny   any log

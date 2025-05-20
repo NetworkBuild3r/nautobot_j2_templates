@@ -4,7 +4,6 @@ ip access-list standard VTY_ACCESS_ACL
  20 permit 192.168.0.0 0.0.255.255	
  30 deny   any log	
 !
-! Line Configurations
 line con 0
  exec-timeout 15 0
  logging synchronous
@@ -28,3 +27,4 @@ line vty 5 15
  transport input ssh
 line vty 16 31
  transport input ssh
+
