@@ -1,16 +1,13 @@
-{% include './common/cisco/hostname.j2' ignore missing -%}
-{% include './common/cisco/global_settings.j2' ignore missing -%}
-{% include './common/cisco/vrfs.j2' ignore missing -%}
-{% include './common/cisco/ios_snmp.j2' ignore missing -%}
-{% include './common/cisco/logging_config.j2' ignore missing -%}
-{% include './common/cisco/enable_secret.j2' ignore missing -%}
-{% include './common/cisco/crypto.j2' ignore missing -%}
-{% include './common/cisco/policy_maps.j2' ignore missing -%}
-{% include './common/cisco/interfaces.j2' ignore missing -%}
-{#{% include './cisco/common/access_lists.j2' ignore missing -%}#}
-{% include './common/cisco/banner.j2' ignore missing -%}
-{% include './common/cisco/line_configs.j2' ignore missing -%}
-{% include './common/cisco/call_home.j2' ignore missing -%}
-{% include './common/cisco/aaa.j2' ignore missing -%}
-{% include './common/cisco/ntp.j2' ignore missing -%}
-{% include './common/cisco/syslog.j2' ignore missing -%}
+{# Main template for Cisco XE access switches #}
+{% include 'common/cisco/hostname.j2' %}
+{% include 'common/cisco/common/cisco/global_settings.j2' %}
+{% include 'common/cisco/common/cisco/vrfs.j2' %}
+{% include 'common/cisco/common/cisco/aaa.j2' %}
+{% include 'common/cisco/common/cisco/interfaces.j2' %}
+{% include 'common/cisco/common/cisco/ios_snmp.j2' %}
+{% include 'common/cisco/common/cisco/ntp.j2' %}
+{% include 'common/cisco/common/cisco/syslog.j2' %}
+
+{# Access-specific configurations #}
+{% include 'access/access/management_svi.j2' %}
+{% include 'access/access/uplink_portchannel.j2' %}
