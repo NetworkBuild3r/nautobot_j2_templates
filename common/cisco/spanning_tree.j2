@@ -2,6 +2,7 @@
 !
 {%- if stp and stp.get('mode') %}
 spanning-tree mode {{ stp.mode }}
+    %
 {%- else %}
 spanning-tree mode mst
 {%- endif %}
