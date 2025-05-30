@@ -23,13 +23,13 @@ storm-control action {{ action }}
 
 {#- Define common variables with safe defaults -#}
 {%- set port_channel_regex = '(?i)^(Port-channel|Po)\d+' %}
-{%- set interfaces_all = interfaces if (interfaces is defined) else (graphql_data.device.interfaces if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.interfaces is defined) else (data.device.interfaces if (data is defined and data.device is defined and data.device.interfaces is defined) else (host.data.device.interfaces if (host is defined and host.data is defined and host.data.device is defined and host.data.device.interfaces is defined) else []))) %}
+{%- set interfaces_all = graphql_data.device.interfaces if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.interfaces is defined) else [] %}
 ! DEBUG: Found {{ interfaces_all | length }} total interfaces: {{ interfaces_all | map(attribute='name') | join(', ') }}
 {%- set port_channels = interfaces_all | selectattr('name', 'match', port_channel_regex) | list %}
 {%- set physical_svi_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | list %}
 
 {#- Safely retrieve uplink description -#}
-{%- set default_uplink_description_device = (graphql_data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.config_context is defined) else (data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (data is defined and data.device is defined and data.device.config_context is defined) else (host.data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (host is defined and host.data is defined and host.data.device is defined and host.data.device.config_context is defined) else 'PEDC-A-DIST-SW01'))) %}
+{%- set default_uplink_description_device = graphql_data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.config_context is defined) else 'PEDC-A-DIST-SW01' %}
 {%- set ns.default_uplink_description = 'UPLINK to ' ~ default_uplink_description_device %}
 
 {#- Default VLANs aligned with GraphQL data -#}
@@ -113,7 +113,7 @@ interface {{ intf.name }}
   {%- endif %}
   {%- if intf._custom_field_data.get('bpduguard') %}
  spanning-tree bpduguard enable
-  %- endif %}
+  {%- endif %}
   {%- if intf._custom_field_data.get('dhcp_snooping_limit') %}
  ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
   {%- endif %}
@@ -125,17 +125,17 @@ interface {{ intf.name }}
  switchport nonegotiate
   {%- if intf._custom_field_data.get('storm_control_level') %}
  storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
-  {%- else %}
+  %- else %}
  storm-control broadcast level bps 20m
-  %- endif %}
+  {%- endif %}
   {%- set action_value = intf._custom_field_data.get('storm_control_action') %}
   {%- if action_value is string %}
    {%- set action = action_value %}
   {%- elif action_value is iterable and action_value | length > 0 %}
    {%- set action = action_value[0] %}
-  %- else %}
+  {%- else %}
    {%- set action = none %}
-  {%- endif %}
+  %- endif %}
   %- if action and action != 'drop' %}
  storm-control action {{ action }}
   %- else %}
@@ -147,13 +147,13 @@ interface {{ intf.name }}
  %- endif %}
 
  {#- LAG Membership -#}
- %- if intf.lag and intf.lag.name %}
- %- set channel_group_number = intf.lag.name | regex_replace('(?i)^(?:Port-channel|Po)\s*', '') | int %}
+ {%- if intf.lag and intf.lag.name %}
+ {%- set channel_group_number = intf.lag.name | regex_replace('(?i)^(?:Port-channel|Po)\s*', '') | int %}
  channel-group {{ channel_group_number }} mode active
- %- endif %}
+ {%- endif %}
 
- %- if not intf.enabled %}
+ {%- if not intf.enabled %}
  shutdown
- %- endif %}
+ {%- endif %}
 !
-%- endfor %}
+{%- endfor %}
