@@ -1,5 +1,6 @@
 {#- storm_control.j2: Macro for Cisco storm control configuration -#}
 {%- macro storm(custom_fields, is_trunk=false) %}
+! DEBUG: Processing storm control for is_trunk={{ is_trunk }}
 {%- set level = custom_fields.get('storm_control_level') %}
 {%- set action = custom_fields.get('storm_control_action') %}
 {%- if level and level != '' %}

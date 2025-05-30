@@ -1,6 +1,7 @@
 {#- interfaces.j2: Main template for rendering Cisco interface configurations -#}
 {#- Whitespace control for cleaner output -#}
 
+! DEBUG: Starting interfaces.j2
 {%- set ns = namespace() -%} {# Namespace for reusable variables -#}
 
 {#- Define common variables with safe defaults -#}
@@ -18,9 +19,11 @@
 {%- set ns.default_allowed_vlans = '2,102' %}
 
 {#- Include storm control macro -#}
+! DEBUG: Including common/cisco/storm_control.j2
 {%- include 'common/cisco/storm_control.j2' %}
 
 {#- PORT-CHANNEL INTERFACES -#}
+! DEBUG: Processing {{ port_channels | length }} port channels
 {%- for pc in port_channels %}
 interface {{ pc.name }}
  description {{ pc.description | default(ns.default_uplink_description) }}
@@ -42,20 +45,22 @@ interface {{ pc.name }}
 {%- endfor %}
 
 {#- PHYSICAL & SVI INTERFACES -#}
+! DEBUG: Processing {{ physical_svi_interfaces | length }} physical/SVI interfaces
 {%- for intf in physical_svi_interfaces %}
 interface {{ intf.name }}
+ ! DEBUG: Rendering interface {{ intf.name }}
  {#- Description -#}
  {%- if intf.description and intf.description != ns.default_uplink_description %}
  description {{ intf.description }}
  {%- endif %}
 
- {#- IP Address Configuration: Use cidr_to_netmask filter -#}
+ {#- IP Address Configuration: Use cidr_to_netmask filter with fallback -#}
  {%- if intf.ip_addresses and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address %}
  {%- set ip_network_obj = intf.ip_addresses[0].address %}
  {%- set ip_parts = ip_network_obj.split('/') %}
  {%- set ip_address = ip_parts[0] %}
  {%- set prefix_length = ip_parts[1] | int %}
- {%- set netmask = prefix_length | cidr_to_netmask %}
+ {%- set netmask = prefix_length | cidr_to_netmask if (prefix_length | cidr_to_netmask) else '255.255.255.0' %}
  ip address {{ ip_address }} {{ netmask }}
  {%- endif %}
 
@@ -84,7 +89,7 @@ interface {{ intf.name }}
 
  {#- Storm Control -#}
  {%- if intf.mode in ['ACCESS', 'TAGGED', 'TAGGED_ALL'] %}
- {{ storm(intf._custom_field_data, is_trunk=(intf.mode in ['TAGGED', 'TAGGED_ALL'])) | indent(2) }}
+ {{ storm(intf._custom_field_data, is_trunk=(pc.mode in ['TAGGED', 'TAGGED_ALL'])) | indent(2) }}
  {%- endif %}
 
  {#- DHCP Snooping -#}
@@ -108,3 +113,4 @@ interface {{ intf.name }}
  {%- endif %}
 !
 {%- endfor %}
+! DEBUG: Completed interfaces.j2
