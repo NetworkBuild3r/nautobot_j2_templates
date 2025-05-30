@@ -1,33 +1,73 @@
-{#- interfaces.j2: Main template for rendering Cisco interface configurations -#}
-{#- Whitespace control for cleaner output -#}
-
-! DEBUG: Starting interfaces.j2
-{%- set ns = namespace() -%} {# Namespace for reusable variables -#}
-
-{#- Define storm control macro -#}
-{%- macro storm(custom_fields, is_trunk=false) %}
-! DEBUG: Processing storm control for is_trunk={{ is_trunk }}
-{%- set level = custom_fields.get('storm_control_level') %}
-{%- set action = custom_fields.get('storm_control_action') %}
-{%- if level and level != '' %}
-storm-control broadcast level {{ level }}
-storm-control multicast level {{ level }}
-{%- if not is_trunk %}
-storm-control unicast level {{ level }}
+{%- macro render_storm_control(intf) -%}
+{%- if intf._custom_field_data.get('storm_control_level') %}
+storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
+{%- else %}
+storm-control broadcast level bps 20m
 {%- endif %}
-{%- if action and action != '' %}
+{%- if intf._custom_field_data.get('storm_control_action') %}
+ {% set action_value = intf._custom_field_data.get('storm_control_action') %}
+ {% if action_value is string %}
+  {% set action = action_value %}
+ {% elif action_value is iterable and action_value | length > 0 %}
+  {% set action = action_value[0] %}
+ {% else %}
+  {% set action = none %}
+ {% endif %}
+ {% if action and action != 'drop' %}
 storm-control action {{ action }}
+ {% endif %}
+{%- else %}
+storm-control action shutdown
 {%- endif %}
+{%- endmacro -%}
+
+{%- for intf in interfaces | sort(attribute='name') -%}
+interface {{ intf.name }}
+{%- if intf.description and intf.description != 'Uplink to PEDC-A-DIST-SW01' %}
+ description {{ intf.description }}
 {%- endif %}
-{%- endmacro %}
-
-{#- Define common variables with safe defaults -#}
-{%- set port_channel_regex = '(?i)^(Port-channel|Po)\d+' %}
-{%- set interfaces_all = graphql_data.interfaces if (graphql_data is defined and graphql_data.interfaces is defined) else [] %}
-! DEBUG: Found {{ interfaces_all | length }} total interfaces: {{ interfaces_all | map(attribute='name') | join(', ') }}
-{%- set port_channels = interfaces_all | selectattr('name', 'match', port_channel_regex) | list %}
-{%- set physical_svi_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | list %}
-
-{#- Safely retrieve uplink description -#}
-{%- set default_uplink_description_device = graphql_data.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (graphql_data is defined and graphql_data.config_context is defined) else 'PEDC-A-DIST-SW01' %}
-{%- set ns.default_uplink_description = 'UPLINK to ' ~ default_uplink_description_device %}
+{%- if intf.ip_addresses %}
+ ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
+{%- endif %}
+{%- if intf.mode == 'ACCESS' %}
+ {%- if intf.untagged_vlan and intf.untagged_vlan.vid %}
+ switchport access vlan {{ intf.untagged_vlan.vid }}
+ {%- endif %}
+ switchport mode access
+ {%- if intf._custom_field_data.get('cf_voice_vlan') %}
+ switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
+ {%- endif %}
+ {%- if intf._custom_field_data.get('storm_control_level') %}
+ storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}
+ {%- endif %}
+ {%- if intf._custom_field_data.get('portfast') %}
+ spanning-tree portfast
+ {%- endif %}
+ {%- if intf._custom_field_data.get('bpduguard') %}
+ spanning-tree bpduguard enable
+ {%- endif %}
+ {%- if intf._custom_field_data.get('dhcp_snooping_limit') %}
+ ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
+ {%- endif %}
+{%- elif intf.mode == 'TAGGED_ALL' or intf.name.startswith('Port-channel') %}
+ switchport trunk native vlan 1000
+ {%- if intf.tagged_vlans %}
+ switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
+ {%- else %}
+ switchport trunk allowed vlan 2,102,1000
+ {%- endif %}
+ switchport mode trunk
+ switchport nonegotiate
+ {%- if intf.name in ['TenGigabitEthernet1/1/3', 'TenGigabitEthernet1/1/4'] %}
+ channel-group 1 mode active
+ {%- endif %}
+ {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
+ ip dhcp snooping trust
+ {%- endif %}
+ {{ render_storm_control(intf) | indent(2) }}
+{%- endif %}
+{%- if not intf.enabled %}
+ shutdown
+{%- endif %}
+!
+{%- endfor -%}
