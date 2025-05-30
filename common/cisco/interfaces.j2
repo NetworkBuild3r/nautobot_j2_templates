@@ -125,7 +125,7 @@ interface {{ intf.name }}
  switchport nonegotiate
   {%- if intf._custom_field_data.get('storm_control_level') %}
  storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
-  %- else %}
+  {%- else %}
  storm-control broadcast level bps 20m
   {%- endif %}
   {%- set action_value = intf._custom_field_data.get('storm_control_action') %}
@@ -135,16 +135,16 @@ interface {{ intf.name }}
    {%- set action = action_value[0] %}
   {%- else %}
    {%- set action = none %}
-  %- endif %}
-  %- if action and action != 'drop' %}
+  {%- endif %}
+  {%- if action and action != 'drop' %}
  storm-control action {{ action }}
-  %- else %}
+  {%- else %}
  storm-control action shutdown
-  %- endif %}
-  %- if intf._custom_field_data.get('dhcp_snooping_trust') %}
+  {%- endif %}
+  {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
  ip dhcp snooping trust
-  %- endif %}
- %- endif %}
+  {%- endif %}
+ {%- endif %}
 
  {#- LAG Membership -#}
  {%- if intf.lag and intf.lag.name %}
