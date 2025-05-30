@@ -1,74 +1,75 @@
-{%- macro render_storm_control(intf) -%}
-{#- Debug: Using updated render_storm_control macro (May 30, 2025) to ensure storm-control commands are on the same line -#}
-{%- set level_cmd = '' -%}
-{%- if intf._custom_field_data.get('storm_control_level') %}
-{%- set level_cmd = 'storm-control broadcast level bps ' ~ intf._custom_field_data.get('storm_control_level') -%}
-{%- else %}
-{%- set level_cmd = 'storm-control broadcast level bps 20m' -%}
-{%- endif %}
-{%- set action_cmd = '' -%}
-{%- if intf._custom_field_data.get('storm_control_action') %}
- {% set action_value = intf._custom_field_data.get('storm_control_action') %}
- {% if action_value is string %}
-  {% set action = action_value %}
- {% elif action_value is iterable and action_value | length > 0 %}
-  {% set action = action_value[0] %}
- {% else %}
-  {% set action = none %}
- {% endif %}
- {% if action and action != 'drop' %}
-{%- set action_cmd = 'storm-control action ' ~ action -%}
- {% endif %}
-{%- else %}
-{%- set action_cmd = 'storm-control action shutdown' -%}
-{%- endif %}
+{% macro render_storm_control(intf) %}
+{# Debug: Using updated render_storm_control macro (May 30, 2025) to ensure storm-control commands are on the same line #}
+{% set level_cmd = '' %}
+{% if intf._custom_field_data.get('storm_control_level') %}
+  {% set level_cmd = 'storm-control broadcast level bps ' ~ intf._custom_field_data.get('storm_control_level') %}
+{% else %}
+  {% set level_cmd = 'storm-control broadcast level bps 20m' %}
+{% endif %}
+{% set action_cmd = '' %}
+{% if intf._custom_field_data.get('storm_control_action') %}
+  {% set action_value = intf._custom_field_data.get('storm_control_action') %}
+  {% if action_value is string %}
+    {% set action = action_value %}
+  {% elif action_value is iterable and action_value | length > 0 %}
+    {% set action = action_value[0] %}
+  {% else %}
+    {% set action = none %}
+  {% endif %}
+  {% if action and action != 'drop' %}
+    {% set action_cmd = 'storm-control action ' ~ action %}
+  {% endif %}
+{% else %}
+  {% set action_cmd = 'storm-control action shutdown' %}
+{% endif %}
 {{ level_cmd }}{{ action_cmd }}
-{%- endmacro -%}
+{% endmacro %}
 
-{%- for intf in interfaces | sort(attribute='name') -%}
+{% for intf in interfaces | sort(attribute='name') %}
 interface {{ intf.name }}
-{%- if intf.description and intf.description != 'Uplink to PEDC-A-DIST-SW01' %}
+{% if intf.description and intf.description != 'Uplink to PEDC-A-DIST-SW01' %}
  description {{ intf.description }}
-{%- endif %}
-{%- if intf.ip_addresses %}
- ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
-{%- endif %}
-{%- if intf.mode == 'ACCESS' %}
- {%- if intf.untagged_vlan and intf.untagged_vlan.vid %}
+{% endif %}
+{% if intf.ip_addresses %}
+ ip address {{ intf.ip_addresses[0].address.split('/') [0] }} {{ intf.ip_addresses[0].address.split('/') [1] | int | cidr_to_netmask }}
+{% endif %}
+{% if intf.mode == 'ACCESS' %}
+  {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport access vlan {{ intf.untagged_vlan.vid }}
- {%- endif %}
+  {% endif %}
  switchport mode access
- {%- if intf._custom_field_data.get('storm_control_level') %}
+  {% if intf._custom_field_data.get('storm_control_level') %}
  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}
- {%- endif %}
- {%- if intf._custom_field_data.get('portfast') %}
+  {% endif %}
+  {% if intf._custom_field_data.get('portfast') %}
  spanning-tree portfast
- {%- endif %}
- {%- if intf._custom_field_data.get('bpduguard') %}
+  {% endif %}
+  {% if intf._custom_field_data.get('bpduguard') %}
  spanning-tree bpduguard enable
- {%- endif %}
- {%- if intf._custom_field_data.get('dhcp_snooping_limit') %}
+  {% endif %}
+  {% if intf._custom_field_data.get('dhcp_snooping_limit') %}
  ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
- {%- endif %}
-{%- elif intf.mode == 'TAGGED_ALL' or intf.name.startswith('Port-channel') or intf.name == 'GigabitEthernet2' %}
+  {% endif %}
+{% elif intf.mode == 'TAGGED_ALL' or intf.name.startswith('Port-channel') or intf.name == 'GigabitEthernet2' %}
  switchport trunk native vlan 1000
- {%- if intf.tagged_vlans %}
+  {% if intf.tagged_vlans %}
  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
- {%- else %}
+  {% else %}
  switchport trunk allowed vlan 2,102,1000
- {%- endif %}
+  {% endif %}
  switchport mode trunk
  switchport nonegotiate
- {%- if intf.name in ['TenGigabitEthernet1/1/3', 'TenGigabitEthernet1/1/4'] %}
+  {% if intf.name in ['TenGigabitEthernet1/1/3', 'TenGigabitEthernet1/1/4'] %}
  channel-group 1 mode active
- {%- endif %}
- {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
+  {% endif %}
+  {% if intf._custom_field_data.get('dhcp_snooping_trust') %}
  ip dhcp snooping trust
- {%- endif %}
+  {% endif %}
  {{ render_storm_control(intf) }}
-{%- endif %}
-{%- if not intf.enabled %}
+{% endif %}
+{% if not intf.enabled %}
  shutdown
 {% endif %}
 !
-{%- endfor -%}
+
+{% endfor %}
