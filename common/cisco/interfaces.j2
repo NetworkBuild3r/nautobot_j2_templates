@@ -4,28 +4,46 @@
 ! DEBUG: Starting interfaces.j2
 {%- set ns = namespace() -%} {# Namespace for reusable variables -#}
 
+{#- Define storm control macro -#}
+{%- macro storm(custom_fields, is_trunk=false) %}
+! DEBUG: Processing storm control for is_trunk={{ is_trunk }}
+{%- set level = custom_fields.get('storm_control_level') %}
+{%- set action = custom_fields.get('storm_control_action') %}
+{%- if level and level != '' %}
+storm-control broadcast level {{ level }}
+storm-control multicast level {{ level }}
+{%- if not is_trunk %}
+storm-control unicast level {{ level }}
+{%- endif %}
+{%- if action and action != '' %}
+storm-control action {{ action }}
+{%- endif %}
+{%- endif %}
+{%- endmacro %}
+
 {#- Define common variables with safe defaults -#}
 {%- set port_channel_regex = '(?i)^(Port-channel|Po)\d+' %}
 {%- set interfaces_all = graphql_data.device.interfaces if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.interfaces is defined) else [] %}
 ! DEBUG: Found {{ interfaces_all | length }} total interfaces: {{ interfaces_all | map(attribute='name') | join(', ') }}
 {%- set port_channels = interfaces_all | selectattr('name', 'match', port_channel_regex) | list %}
-{%- set physical_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | list %}
+{%- set physical_svi_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | list %}
 
-{%- set ns.default_uplink_description = 'UPLINK to PEDC-A-DIST-SW01' %}
+{#- Safely retrieve uplink description -#}
+{%- set default_uplink_description_device = graphql_data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.config_context is defined) else 'PEDC-A-DIST-SW01' %}
+{%- set ns.default_uplink_description = 'UPLINK to ' ~ default_uplink_description_device %}
+
+{#- Default VLANs aligned with GraphQL data -#}
 {%- set ns.default_native_vlan = 2 %}
-{%- set ns.default_allowed = '2,102' %}
+{%- set ns.default_allowed_vlans = '2,102' %}
 
-{#- Include storm control macro -#}
-! DEBUG: Including common/cisco/storm_control.j2
-{%- include 'storm_control.j2' %}
-
+{#- PORT-CHANNEL INTERFACES -#}
 ! DEBUG: Processing {{ port_channels | length }} port channels
 {%- for pc in port_channels %}
 interface {{ pc.name }}
  description {{ pc.description | default(ns.default_uplink_description) }}
  {%- if pc.mode in ['TAGGED', 'TAGGED_ALL'] %}
  switchport trunk native vlan {{ pc.untagged_vlan.vid | default(ns.default_native_vlan) if pc.untagged_vlan else ns.default_native_vlan }}
- {%- set allowed_vlans_pc = pc.tagged_vlans | map(attribute='vid') | default([]) %}
+ {%- set allowed_vlans_pc = pc.tagged_vlans | map(attribute='vid') | sort | default([]) %}
  switchport trunk allowed vlan {{ allowed_vlans_pc | join(',') if allowed_vlans_pc else ns.default_allowed_vlans }}
  switchport mode trunk
  switchport nonegotiate
@@ -40,8 +58,9 @@ interface {{ pc.name }}
 !
 {%- endfor %}
 
-! DEBUG: Processing {{ physical_interfaces | length }} physical/SVI interfaces
-{%- for intf in physical_interfaces %}
+{#- PHYSICAL & SVI INTERFACES -#}
+! DEBUG: Processing {{ physical_svi_interfaces | length }} physical/SVI interfaces
+{%- for intf in physical_svi_interfaces %}
 interface {{ intf.name }}
  ! DEBUG: Rendering interface {{ intf.name }}
  {#- Description -#}
@@ -72,13 +91,13 @@ interface {{ intf.name }}
  switchport mode trunk
  switchport nonegotiate
  switchport trunk native vlan {{ intf.untagged_vlan.vid | default(ns.default_native_vlan) if intf.untagged_vlan else ns.default_native_vlan }}
- {%- set allowed_vlans_intf = intf.tagged_vlans | map(attribute='vid') | default([]) %}
+ {%- set allowed_vlans_intf = intf.tagged_vlans | map(attribute='vid') | sort | default([]) %}
  switchport trunk allowed vlan {{ allowed_vlans_intf | join(',') if allowed_vlans_intf else ns.default_allowed_vlans }}
  {%- endif %}
 
  {#- LAG Membership -#}
  {%- if intf.lag and intf.lag.name %}
- {%- set channel_group_number = intf.lag.name | regex_replace('(?i)^(?:Port-channel|Po)', '') | int %}
+ {%- set channel_group_number = intf.lag.name | regex_replace('(?i)^(?:Port-channel|Po)\s*', '') | int %}
  channel-group {{ channel_group_number }} mode active
  {%- endif %}
 
