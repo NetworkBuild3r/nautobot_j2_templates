@@ -1,28 +1,36 @@
 {#- interfaces.j2: Main template for rendering Cisco interface configurations -#}
-{#- Uses modular includes and robust data handling for Nautobot Golden Config -#}
+{#- Includes debugging to trace rendering progress -#}
 
 {#- Whitespace control for cleaner output -#}
 {%- set ns = namespace() -%} {# Namespace for reusable variables -#}
 
+{#- Debug: Log start of template rendering -#}
+{%- debug %} {# Outputs template context to logs -#}
+
 {#- Define common variables with safe defaults -#}
-{%- set port_channel_regex = '(?i)^(Port-channel|Po)\s*\d+' %} {# Flexible regex for PortChannels -#}
+{%- set port_channel_regex = '(?i)^(Port-channel|Po)\s*\d+' %}
 {%- set interfaces_all = data.device.interfaces if (data is defined and data.device is defined and data.device.interfaces is defined) else [] %}
 {%- set port_channels = interfaces_all | selectattr('name', 'match', port_channel_regex) | sort(attribute='name') %}
 {%- set physical_svi_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | sort(attribute='name') %}
 
-{#- Safely retrieve uplink description from config_context -#}
+{#- Safely retrieve uplink description -#}
 {%- set default_uplink_description_device = data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (data is defined and data.device is defined and data.device.config_context is defined) else 'PEDC-A-DIST-SW01' %}
 {%- set ns.default_uplink_description = 'UPLINK to ' ~ default_uplink_description_device %}
 
-{#- Default VLANs for consistency -#}
+{#- Default VLANs -#}
 {%- set ns.default_native_vlan = 1000 %}
 {%- set ns.default_allowed_vlans = '2,102,1000' %}
 
-{#- Include storm control macro from a separate file for modularity -#}
-{%- include 'common/cisco/storm_control.j2' -%}
+{#- Include storm control macro -#}
+{%- include 'common/cisco/storm_control.j2' %}
+
+{#- Debug: Log port channels count -#}
+{%- if port_channels %}
+{%- set port_channel_count = port_channels | length %}
+{%- debug msg="Processing " ~ port_channel_count ~ " port channels" %}
+{%- endif %}
 
 {#- PORT-CHANNEL INTERFACES -#}
-{%- if port_channels %}
 {%- for pc in port_channels %}
 interface {{ pc.name }}
  description {{ pc.description | default(ns.default_uplink_description) }}
@@ -42,20 +50,29 @@ interface {{ pc.name }}
  {%- endif %}
 !
 {%- endfor %}
-{%- endif %}
+
+{#- Debug: Log physical/SVI interfaces count -#}
+{%- set physical_svi_count = physical_svi_interfaces | length %}
+{%- debug msg="Processing " ~ physical_svi_count ~ " physical/SVI interfaces" %}
 
 {#- PHYSICAL & SVI INTERFACES -#}
 {%- for intf in physical_svi_interfaces %}
 interface {{ intf.name }}
- {#- Only add description if it exists and differs from default -#}
+ {#- Debug: Log current interface -#}
+ {%- debug msg="Rendering interface " ~ intf.name %}
+ {#- Description -#}
  {%- if intf.description and intf.description != ns.default_uplink_description %}
  description {{ intf.description }}
  {%- endif %}
 
- {#- IP Address Configuration -#}
+ {#- IP Address Configuration: Avoid ipaddr filter -#}
  {%- if intf.ip_addresses and intf.ip_addresses[0] %}
  {%- set ip_network_obj = intf.ip_addresses[0].address %}
- ip address {{ ip_network_obj | ipaddr('address') }} {{ ip_network_obj | ipaddr('netmask') }}
+ {%- set ip_parts = ip_network_obj.split('/') %}
+ {%- set ip_address = ip_parts[0] %}
+ {%- set prefix_length = ip_parts[1] | int %}
+ {%- set netmask = '255.255.255.255' if prefix_length == 32 else '255.255.255.254' if prefix_length == 31 else '255.255.255.0' if prefix_length == 24 else '255.255.255.252' %}
+ ip address {{ ip_address }} {{ netmask }}
  {%- endif %}
 
  {#- Layer-2 Mode Handling -#}
@@ -81,7 +98,7 @@ interface {{ intf.name }}
  channel-group {{ channel_group_number }} mode active
  {%- endif %}
 
- {#- Storm Control for L2 Interfaces -#}
+ {#- Storm Control -#}
  {%- if intf.mode in ['ACCESS', 'TAGGED', 'TAGGED_ALL'] %}
  {{ storm(intf._custom_field_data, is_trunk=(intf.mode in ['TAGGED', 'TAGGED_ALL'])) | indent(2) }}
  {%- endif %}
@@ -107,3 +124,6 @@ interface {{ intf.name }}
  {%- endif %}
 !
 {%- endfor %}
+
+{#- Debug: Log completion -#}
+{%- debug msg="Completed rendering interfaces.j2" %}
