@@ -1,11 +1,7 @@
 {#- interfaces.j2: Main template for rendering Cisco interface configurations -#}
-{#- Includes debugging to trace rendering progress -#}
-
 {#- Whitespace control for cleaner output -#}
-{%- set ns = namespace() -%} {# Namespace for reusable variables -#}
 
-{#- Debug: Log start of template rendering -#}
-{%- debug %} {# Outputs template context to logs -#}
+{%- set ns = namespace() -%} {# Namespace for reusable variables -#}
 
 {#- Define common variables with safe defaults -#}
 {%- set port_channel_regex = '(?i)^(Port-channel|Po)\s*\d+' %}
@@ -17,31 +13,25 @@
 {%- set default_uplink_description_device = data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (data is defined and data.device is defined and data.device.config_context is defined) else 'PEDC-A-DIST-SW01' %}
 {%- set ns.default_uplink_description = 'UPLINK to ' ~ default_uplink_description_device %}
 
-{#- Default VLANs -#}
-{%- set ns.default_native_vlan = 1000 %}
-{%- set ns.default_allowed_vlans = '2,102,1000' %}
+{#- Default VLANs aligned with GraphQL data -#}
+{%- set ns.default_native_vlan = 2 %}
+{%- set ns.default_allowed_vlans = '2,102' %}
 
 {#- Include storm control macro -#}
 {%- include 'common/cisco/storm_control.j2' %}
-
-{#- Debug: Log port channels count -#}
-{%- if port_channels %}
-{%- set port_channel_count = port_channels | length %}
-{%- debug msg="Processing " ~ port_channel_count ~ " port channels" %}
-{%- endif %}
 
 {#- PORT-CHANNEL INTERFACES -#}
 {%- for pc in port_channels %}
 interface {{ pc.name }}
  description {{ pc.description | default(ns.default_uplink_description) }}
  {%- if pc.mode in ['TAGGED', 'TAGGED_ALL'] %}
- switchport trunk native vlan {{ pc.untagged_vlan.vid | default(ns.default_native_vlan) }}
- {%- set allowed_vlans_pc = pc.tagged_vlans | map(attribute='vid') | sort %}
+ switchport trunk native vlan {{ pc.untagged_vlan.vid | default(ns.default_native_vlan) if pc.untagged_vlan else ns.default_native_vlan }}
+ {%- set allowed_vlans_pc = pc.tagged_vlans | map(attribute='vid') | sort if pc.tagged_vlans else [] %}
  switchport trunk allowed vlan {{ allowed_vlans_pc | join(',') if allowed_vlans_pc else ns.default_allowed_vlans }}
  switchport mode trunk
  switchport nonegotiate
  {%- endif %}
- {{ storm(pc._custom_field_data, is_trunk=true) | indent(2) }}
+ {{ storm(pc._custom_field_data, is_trunk=(pc.mode in ['TAGGED', 'TAGGED_ALL'])) | indent(2) }}
  {%- if pc._custom_field_data.get('dhcp_snooping_trust') %}
  ip dhcp snooping trust
  {%- endif %}
@@ -51,27 +41,25 @@ interface {{ pc.name }}
 !
 {%- endfor %}
 
-{#- Debug: Log physical/SVI interfaces count -#}
-{%- set physical_svi_count = physical_svi_interfaces | length %}
-{%- debug msg="Processing " ~ physical_svi_count ~ " physical/SVI interfaces" %}
-
 {#- PHYSICAL & SVI INTERFACES -#}
 {%- for intf in physical_svi_interfaces %}
 interface {{ intf.name }}
- {#- Debug: Log current interface -#}
- {%- debug msg="Rendering interface " ~ intf.name %}
  {#- Description -#}
  {%- if intf.description and intf.description != ns.default_uplink_description %}
  description {{ intf.description }}
  {%- endif %}
 
- {#- IP Address Configuration: Avoid ipaddr filter -#}
- {%- if intf.ip_addresses and intf.ip_addresses[0] %}
+ {#- IP Address Configuration: Dynamic netmask calculation -#}
+ {%- if intf.ip_addresses and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address %}
  {%- set ip_network_obj = intf.ip_addresses[0].address %}
  {%- set ip_parts = ip_network_obj.split('/') %}
  {%- set ip_address = ip_parts[0] %}
  {%- set prefix_length = ip_parts[1] | int %}
- {%- set netmask = '255.255.255.255' if prefix_length == 32 else '255.255.255.254' if prefix_length == 31 else '255.255.255.0' if prefix_length == 24 else '255.255.255.252' %}
+ {%- set netmask = '0.0.0.0' %}
+ {%- if prefix_length > 0 %}
+ {%- set netmask = ((2**32 - 2**(32 - prefix_length)) | format('0>32b')) | regex_replace('(.{8})(.{8})(.{8})(.{8})', r'\1.\2.\3.\4') | regex_replace('0', '0') | regex_replace('1', '1') %}
+ {%- set netmask = netmask | regex_replace('0', '0') | regex_replace('1', '255') %}
+ {%- endif %}
  ip address {{ ip_address }} {{ netmask }}
  {%- endif %}
 
@@ -87,8 +75,8 @@ interface {{ intf.name }}
  {%- elif intf.mode in ['TAGGED', 'TAGGED_ALL'] %}
  switchport mode trunk
  switchport nonegotiate
- switchport trunk native vlan {{ intf.untagged_vlan.vid | default(ns.default_native_vlan) }}
- {%- set allowed_vlans_intf = intf.tagged_vlans | map(attribute='vid') | sort %}
+ switchport trunk native vlan {{ intf.untagged_vlan.vid | default(ns.default_native_vlan) if intf.untagged_vlan else ns.default_native_vlan }}
+ {%- set allowed_vlans_intf = intf.tagged_vlans | map(attribute='vid') | sort if intf.tagged_vlans else [] %}
  switchport trunk allowed vlan {{ allowed_vlans_intf | join(',') if allowed_vlans_intf else ns.default_allowed_vlans }}
  {%- endif %}
 
@@ -124,6 +112,3 @@ interface {{ intf.name }}
  {%- endif %}
 !
 {%- endfor %}
-
-{#- Debug: Log completion -#}
-{%- debug msg="Completed rendering interfaces.j2" %}

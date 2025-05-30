@@ -1,23 +1,15 @@
-{#- common/cisco/storm_control.j2: Macro for storm-control configuration -#}
-{%- macro storm(data, is_trunk=false) -%}
- {#- Generates storm-control configuration -#}
- {%- set cf_data = data if data is mapping else {} -%}
- {%- set level = cf_data.get('storm_control_level') -%}
- {%- set action_val = cf_data.get('storm_control_action') -%}
-
- {%- if is_trunk %}
- storm-control broadcast level bps {{ level if (level and level|string|trim != '') else '20m' }}
- {%- set act = action_val if action_val else ['shutdown'] %}
- {%- if act is string %}
- storm-control action {{ act if act else 'shutdown' }}
- {%- elif act and act is iterable and act[0] %}
- storm-control action {{ act[0] if act[0] else 'shutdown' }}
- {%- else %}
- storm-control action shutdown
- {%- endif %}
- {%- else %}
- {%- if level and level|string|trim != '' %}
- storm-control broadcast level {{ level }}
- {%- endif %}
- {%- endif %}
-{%- endmacro -%}
+{#- storm_control.j2: Macro for Cisco storm control configuration -#}
+{%- macro storm(custom_fields, is_trunk=false) %}
+{%- set level = custom_fields.get('storm_control_level') %}
+{%- set action = custom_fields.get('storm_control_action') %}
+{%- if level and level != '' %}
+storm-control broadcast level {{ level }}
+storm-control multicast level {{ level }}
+{%- if not is_trunk %}
+storm-control unicast level {{ level }}
+{%- endif %}
+{%- if action and action != '' %}
+storm-control action {{ action }}
+{%- endif %}
+{%- endif %}
+{%- endmacro %}
