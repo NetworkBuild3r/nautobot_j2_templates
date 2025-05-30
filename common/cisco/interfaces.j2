@@ -1,9 +1,11 @@
 {%- macro render_storm_control(intf) -%}
+{%- set level_cmd = '' -%}
 {%- if intf._custom_field_data.get('storm_control_level') %}
-storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
+{%- set level_cmd = 'storm-control broadcast level bps ' ~ intf._custom_field_data.get('storm_control_level') -%}
 {%- else %}
-storm-control broadcast level bps 20m
+{%- set level_cmd = 'storm-control broadcast level bps 20m' -%}
 {%- endif %}
+{%- set action_cmd = '' -%}
 {%- if intf._custom_field_data.get('storm_control_action') %}
  {% set action_value = intf._custom_field_data.get('storm_control_action') %}
  {% if action_value is string %}
@@ -14,11 +16,12 @@ storm-control broadcast level bps 20m
   {% set action = none %}
  {% endif %}
  {% if action and action != 'drop' %}
-storm-control action {{ action }}
+{%- set action_cmd = 'storm-control action ' ~ action -%}
  {% endif %}
 {%- else %}
-storm-control action shutdown
+{%- set action_cmd = 'storm-control action shutdown' -%}
 {%- endif %}
+{{ level_cmd }}{{ action_cmd }}
 {%- endmacro -%}
 
 {%- for intf in interfaces | sort(attribute='name') -%}
