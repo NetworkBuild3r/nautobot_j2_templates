@@ -5,31 +5,27 @@
 {%- set ns = namespace() -%} {# Namespace for reusable variables -#}
 
 {#- Define common variables with safe defaults -#}
-{%- set port_channel_regex = '(?i)^(Port-channel|Po)\s*\d+' %}
-{%- set interfaces_all = data.device.interfaces if (data is defined and data.device is defined and data.device.interfaces is defined) else [] %}
-{%- set port_channels = interfaces_all | selectattr('name', 'match', port_channel_regex) | sort(attribute='name') %}
-{%- set physical_svi_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | sort(attribute='name') %}
+{%- set port_channel_regex = '(?i)^(Port-channel|Po)\d+' %}
+{%- set interfaces_all = graphql_data.device.interfaces if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.interfaces is defined) else [] %}
+! DEBUG: Found {{ interfaces_all | length }} total interfaces: {{ interfaces_all | map(attribute='name') | join(', ') }}
+{%- set port_channels = interfaces_all | selectattr('name', 'match', port_channel_regex) | list %}
+{%- set physical_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | list %}
 
-{#- Safely retrieve uplink description -#}
-{%- set default_uplink_description_device = data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (data is defined and data.device is defined and data.device.config_context is defined) else 'PEDC-A-DIST-SW01' %}
-{%- set ns.default_uplink_description = 'UPLINK to ' ~ default_uplink_description_device %}
-
-{#- Default VLANs aligned with GraphQL data -#}
+{%- set ns.default_uplink_description = 'UPLINK to PEDC-A-DIST-SW01' %}
 {%- set ns.default_native_vlan = 2 %}
-{%- set ns.default_allowed_vlans = '2,102' %}
+{%- set ns.default_allowed = '2,102' %}
 
 {#- Include storm control macro -#}
 ! DEBUG: Including common/cisco/storm_control.j2
-{%- include 'common/cisco/storm_control.j2' %}
+{%- include 'storm_control.j2' %}
 
-{#- PORT-CHANNEL INTERFACES -#}
 ! DEBUG: Processing {{ port_channels | length }} port channels
 {%- for pc in port_channels %}
 interface {{ pc.name }}
  description {{ pc.description | default(ns.default_uplink_description) }}
  {%- if pc.mode in ['TAGGED', 'TAGGED_ALL'] %}
  switchport trunk native vlan {{ pc.untagged_vlan.vid | default(ns.default_native_vlan) if pc.untagged_vlan else ns.default_native_vlan }}
- {%- set allowed_vlans_pc = pc.tagged_vlans | map(attribute='vid') | sort if pc.tagged_vlans else [] %}
+ {%- set allowed_vlans_pc = pc.tagged_vlans | map(attribute='vid') | default([]) %}
  switchport trunk allowed vlan {{ allowed_vlans_pc | join(',') if allowed_vlans_pc else ns.default_allowed_vlans }}
  switchport mode trunk
  switchport nonegotiate
@@ -44,9 +40,8 @@ interface {{ pc.name }}
 !
 {%- endfor %}
 
-{#- PHYSICAL & SVI INTERFACES -#}
-! DEBUG: Processing {{ physical_svi_interfaces | length }} physical/SVI interfaces
-{%- for intf in physical_svi_interfaces %}
+! DEBUG: Processing {{ physical_interfaces | length }} physical/SVI interfaces
+{%- for intf in physical_interfaces %}
 interface {{ intf.name }}
  ! DEBUG: Rendering interface {{ intf.name }}
  {#- Description -#}
@@ -54,7 +49,7 @@ interface {{ intf.name }}
  description {{ intf.description }}
  {%- endif %}
 
- {#- IP Address Configuration: Use cidr_to_netmask filter with fallback -#}
+ {#- IP Address Configuration -#}
  {%- if intf.ip_addresses and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address %}
  {%- set ip_network_obj = intf.ip_addresses[0].address %}
  {%- set ip_parts = ip_network_obj.split('/') %}
@@ -77,19 +72,19 @@ interface {{ intf.name }}
  switchport mode trunk
  switchport nonegotiate
  switchport trunk native vlan {{ intf.untagged_vlan.vid | default(ns.default_native_vlan) if intf.untagged_vlan else ns.default_native_vlan }}
- {%- set allowed_vlans_intf = intf.tagged_vlans | map(attribute='vid') | sort if intf.tagged_vlans else [] %}
+ {%- set allowed_vlans_intf = intf.tagged_vlans | map(attribute='vid') | default([]) %}
  switchport trunk allowed vlan {{ allowed_vlans_intf | join(',') if allowed_vlans_intf else ns.default_allowed_vlans }}
  {%- endif %}
 
  {#- LAG Membership -#}
  {%- if intf.lag and intf.lag.name %}
- {%- set channel_group_number = intf.lag.name | regex_replace('(?i)^(?:Port-channel|Po)\s*', '') | int %}
+ {%- set channel_group_number = intf.lag.name | regex_replace('(?i)^(?:Port-channel|Po)', '') | int %}
  channel-group {{ channel_group_number }} mode active
  {%- endif %}
 
  {#- Storm Control -#}
  {%- if intf.mode in ['ACCESS', 'TAGGED', 'TAGGED_ALL'] %}
- {{ storm(intf._custom_field_data, is_trunk=(pc.mode in ['TAGGED', 'TAGGED_ALL'])) | indent(2) }}
+ {{ storm(intf._custom_field_data, is_trunk=(intf.mode in ['TAGGED', 'TAGGED_ALL'])) | indent(2) }}
  {%- endif %}
 
  {#- DHCP Snooping -#}
