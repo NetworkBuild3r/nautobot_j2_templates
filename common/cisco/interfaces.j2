@@ -34,9 +34,6 @@ interface {{ intf.name }}
  switchport access vlan {{ intf.untagged_vlan.vid }}
  {%- endif %}
  switchport mode access
- {%- if intf._custom_field_data.get('cf_voice_vlan') %}
- switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
- {%- endif %}
  {%- if intf._custom_field_data.get('storm_control_level') %}
  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}
  {%- endif %}
@@ -64,7 +61,7 @@ interface {{ intf.name }}
  {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
  ip dhcp snooping trust
  {%- endif %}
- {{ render_storm_control(intf) | indent(2) }}
+ {{ render_storm_control(intf) }}
 {%- endif %}
 {%- if not intf.enabled %}
  shutdown
