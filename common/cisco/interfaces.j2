@@ -5,156 +5,92 @@
 {%- set ns = namespace() -%} {# Namespace for reusable variables -#}
 
 {#- Define storm control macro -#}
-{%- macro storm(custom_fields, is_trunk=false) %}
+{%- macro storm(custom_fields, is_trunk=false) -%}
 ! DEBUG: Processing storm control for is_trunk={{ is_trunk }}
-{%- set level = custom_fields.get('storm_control_level') %}
-{%- set action = custom_fields.get('storm_control_action') %}
-{%- if level and level != '' %}
+{%- set level = custom_fields.get('storm_control_level') -%}
+{%- set action = custom_fields.get('storm_control_action') -%}
+{%- if level and level != '' -%}
 storm-control broadcast level {{ level }}
 storm-control multicast level {{ level }}
-{%- if not is_trunk %}
+{%- if not is_trunk -%}
 storm-control unicast level {{ level }}
-{%- endif %}
-{%- if action and action != '' %}
+{%- endif -%}
+{%- if action and action != '' -%}
 storm-control action {{ action }}
-{%- endif %}
-{%- endif %}
-{%- endmacro %}
+{%- endif -%}
+{%- endif -%}
+{%- endmacro -%}
 
 {#- Define common variables with safe defaults -#}
-{%- set port_channel_regex = '(?i)^(Port-channel|Po)\d+' %}
-{%- set interfaces_all = interfaces if (interfaces is defined) else (graphql_data.device.interfaces if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.interfaces is defined) else (data.device.interfaces if (data is defined and data.device is defined and data.device.interfaces is defined) else (host.data.device.interfaces if (host is defined and host.data is defined and host.data.device is defined and host.data.device.interfaces is defined) else []))) %}
+{%- set port_channel_regex = '(?i)^(Port-channel|Po)\\d+' -%}
+{%- set interfaces_all = interfaces if interfaces is defined else (graphql_data.device.interfaces if graphql_data is defined and graphql_data.device is defined and graphql_data.device.interfaces is defined else (data.device.interfaces if data is defined and data.device is defined and data.device.interfaces is defined else (host.data.device.interfaces if host is defined and host.data is defined and host.data.device is defined and host.data.device.interfaces is defined else []))) -%}
 ! DEBUG: Found {{ interfaces_all | length }} total interfaces: {{ interfaces_all | map(attribute='name') | join(', ') }}
-{%- set port_channels = interfaces_all | selectattr('name', 'match', port_channel_regex) | list %}
-{%- set physical_svi_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | list %}
+{%- set port_channels = interfaces_all | selectattr('name', 'match', port_channel_regex) | list -%}
+{%- set physical_svi_interfaces = interfaces_all | rejectattr('name', 'match', port_channel_regex) | list -%}
 
 {#- Safely retrieve uplink description -#}
-{%- set default_uplink_description_device = (graphql_data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (graphql_data is defined and graphql_data.device is defined and graphql_data.device.config_context is defined) else (data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (data is defined and data.device is defined and data.device.config_context is defined) else (host.data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if (host is defined and host.data is defined and host.data.device is defined and host.data.device.config_context is defined) else 'PEDC-A-DIST-SW01'))) %}
-{%- set ns.default_uplink_description = 'UPLINK to ' ~ default_uplink_description_device %}
+{%- set default_uplink_description_device = (graphql_data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if graphql_data is defined and graphql_data.device is defined and graphql_data.device.config_context is defined else (data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if data is defined and data.device is defined and data.device.config_context is defined else (host.data.device.config_context.get('site_pedc', {}).get('uplink_switch', 'PEDC-A-DIST-SW01') if host is defined and host.data is defined and host.data.device is defined and host.data.device.config_context is defined else 'PEDC-A-DIST-SW01'))) -%}
+{%- set ns.default_uplink_description = 'UPLINK to ' ~ default_uplink_description_device -%}
 
 {#- Default VLANs aligned with GraphQL data -#}
-{%- set ns.default_native_vlan = 2 %}
-{%- set ns.default_allowed_vlans = '2,102' %}
+{%- set ns.default_native_vlan = 2 -%}
+{%- set ns.default_allowed_vlans = '2,102' -%}
 
 {#- PORT-CHANNEL INTERFACES -#}
 ! DEBUG: Processing {{ port_channels | length }} port channels
-{%- for intf in port_channels %}
+{%- for intf in port_channels -%}
 interface {{ intf.name }}
  ! DEBUG: Rendering interface {{ intf.name }}
  {#- Description -#}
- {%- if intf.description and intf.description != ns.default_uplink_description %}
+ {%- if intf.description and intf.description != ns.default_uplink_description -%}
  description {{ intf.description }}
- {%- else %}
+ {%- else -%}
  description {{ ns.default_uplink_description }}
- {%- endif %}
- {%- if intf.mode in ['TAGGED', 'TAGGED_ALL'] %}
+ {%- endif -%}
+ {%- if intf.mode in ['TAGGED', 'TAGGED_ALL'] -%}
  switchport trunk native vlan {{ intf.untagged_vlan.vid | default(ns.default_native_vlan) if intf.untagged_vlan else ns.default_native_vlan }}
- {%- set allowed_vlans = intf.tagged_vlans | map(attribute='vid') | sort | default([]) %}
+ {%- set allowed_vlans = intf.tagged_vlans | map(attribute='vid') | sort | default([]) -%}
  switchport trunk allowed vlan {{ allowed_vlans | join(',') if allowed_vlans else ns.default_allowed_vlans }}
  switchport mode trunk
  switchport nonegotiate
- {%- if intf._custom_field_data.get('storm_control_level') %}
+ {%- if intf._custom_field_data.get('storm_control_level') -%}
  storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
- {%- else %}
+ {%- else -%}
  storm-control broadcast level bps 20m
- {%- endif %}
- {%- set action_value = intf._custom_field_data.get('storm_control_action') %}
- {%- if action_value is string %}
-  {%- set action = action_value %}
- {%- elif action_value is iterable and action_value | length > 0 %}
-  {%- set action = action_value[0] %}
- {%- else %}
-  {%- set action = none %}
- {%- endif %}
- {%- if action and action != 'drop' %}
+ {%- endif -%}
+ {%- set action_value = intf._custom_field_data.get('storm_control_action') -%}
+ {%- if action_value is string -%}
+  {%- set action = action_value -%}
+ {%- elif action_value is iterable and action_value | length > 0 -%}
+  {%- set action = action_value[0] -%}
+ {%- else -%}
+  {%- set action = none -%}
+ {%- endif -%}
+ {%- if action and action != 'drop' -%}
  storm-control action {{ action }}
- {%- else %}
+ {%- else -%}
  storm-control action shutdown
- {%- endif %}
- {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
+ {%- endif -%}
+ {%- if intf._custom_field_data.get('dhcp_snooping_trust') -%}
  ip dhcp snooping trust
- {%- endif %}
- {%- endif %}
- {%- if not intf.enabled %}
+ {%- endif -%}
+ {%- endif -%}
+ {%- if not intf.enabled -%}
  shutdown
- {%- endif %}
+ {%- endif -%}
 !
-{%- endfor %}
+{%- endfor -%}
 
 {#- PHYSICAL & SVI INTERFACES -#}
 ! DEBUG: Processing {{ physical_svi_interfaces | length }} physical/SVI interfaces
-{%- for intf in physical_svi_interfaces | sort(attribute='name') %}
+{%- for intf in physical_svi_interfaces | sort(attribute='name') -%}
 interface {{ intf.name }}
  ! DEBUG: Rendering interface {{ intf.name }}
  {#- Description -#}
- {%- if intf.description and intf.description != ns.default_uplink_description %}
+ {%- if intf.description and intf.description != ns.default_uplink_description -%}
  description {{ intf.description }}
- {%- endif %}
+ {%- endif -%}
 
  {#- IP Address Configuration -#}
- {%- if intf.ip_addresses and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address %}
- ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
- {%- endif %}
-
- {#- Layer-2 Mode Handling -#}
- {%- if intf.mode == 'ACCESS' %}
-  {%- if intf.untagged_vlan and intf.untagged_vlan.vid %}
- switchport access vlan {{ intf.untagged_vlan.vid }}
-  {%- endif %}
- switchport mode access
-  {%- if intf._custom_field_data.get('cf_voice_vlan') %}
- switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
-  {%- elif intf._custom_field_data.get('voice_vlan') %}
- switchport voice vlan {{ intf._custom_field_data.get('voice_vlan') }}
-  {%- endif %}
- {{ storm(intf._custom_field_data, is_trunk=false) | indent(2) }}
-  {%- if intf._custom_field_data.get('portfast') %}
- spanning-tree portfast
-  {%- endif %}
-  {%- if intf._custom_field_data.get('bpduguard') %}
- spanning-tree bpduguard enable
-  %- endif %}
-  {%- if intf._custom_field_data.get('dhcp_snooping_limit') %}
- ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
-  {%- endif %}
- {%- elif intf.mode in ['TAGGED', 'TAGGED_ALL'] %}
- switchport trunk native vlan {{ intf.untagged_vlan.vid | default(ns.default_native_vlan) if intf.untagged_vlan else ns.default_native_vlan }}
-  {%- set allowed_vlans = intf.tagged_vlans | map(attribute='vid') | sort | default([]) %}
- switchport trunk allowed vlan {{ allowed_vlans | join(',') if allowed_vlans else ns.default_allowed_vlans }}
- switchport mode trunk
- switchport nonegotiate
-  {%- if intf._custom_field_data.get('storm_control_level') %}
- storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
-  {%- else %}
- storm-control broadcast level bps 20m
-  %- endif %}
-  {%- set action_value = intf._custom_field_data.get('storm_control_action') %}
-  {%- if action_value is string %}
-   {%- set action = action_value %}
-  {%- elif action_value is iterable and action_value | length > 0 %}
-   {%- set action = action_value[0] %}
-  %- else %}
-   {%- set action = none %}
-  {%- endif %}
-  %- if action and action != 'drop' %}
- storm-control action {{ action }}
-  %- else %}
- storm-control action shutdown
-  %- endif %}
-  %- if intf._custom_field_data.get('dhcp_snooping_trust') %}
- ip dhcp snooping trust
-  %- endif %}
- %- endif %}
-
- {#- LAG Membership -#}
- %- if intf.lag and intf.lag.name %}
- %- set channel_group_number = intf.lag.name | regex_replace('(?i)^(?:Port-channel|Po)\s*', '') | int %}
- channel-group {{ channel_group_number }} mode active
- %- endif %}
-
- %- if not intf.enabled %}
- shutdown
- %- endif %}
-!
-%- endfor %}
-! DEBUG: Completed interfaces.j2
+ {%- if intf.ip_addresses and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address -%}
+ ip address {{ intf.ip_addresses[0].address.split('/')[
