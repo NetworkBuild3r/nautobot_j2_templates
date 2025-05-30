@@ -1,5 +1,4 @@
 {%- macro render_storm_control(intf) -%}
-{#- Debug: Using updated render_storm_control macro (May 30, 2025) to ensure storm-control commands are on the same line -#}
 {%- set level_cmd = '' -%}
 {%- if intf._custom_field_data.get('storm_control_level') %}
 {%- set level_cmd = 'storm-control broadcast level bps ' ~ intf._custom_field_data.get('storm_control_level') -%}
@@ -26,49 +25,51 @@
 {%- endmacro -%}
 
 {%- for intf in interfaces | sort(attribute='name') -%}
-interface {{ intf.name }}
+{%- set config_lines = [] -%}
+{%- set _ = config_lines.append('interface ' ~ intf.name) -%}
 {%- if intf.description and intf.description != 'Uplink to PEDC-A-DIST-SW01' %}
- description {{ intf.description }}
+{%- set _ = config_lines.append(' description ' ~ intf.description) -%}
 {%- endif %}
 {%- if intf.ip_addresses %}
- ip address {{ intf.ip_addresses[0].address.split('/')[0] }} {{ intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask }}
+{%- set _ = config_lines.append(' ip address ' ~ intf.ip_addresses[0].address.split('/')[0] ~ ' ' ~ (intf.ip_addresses[0].address.split('/')[1] | int | cidr_to_netmask)) -%}
 {%- endif %}
 {%- if intf.mode == 'ACCESS' %}
  {%- if intf.untagged_vlan and intf.untagged_vlan.vid %}
- switchport access vlan {{ intf.untagged_vlan.vid }}
+ {%- set _ = config_lines.append(' switchport access vlan ' ~ intf.untagged_vlan.vid) -%}
  {%- endif %}
- switchport mode access
+ {%- set _ = config_lines.append(' switchport mode access') -%}
  {%- if intf._custom_field_data.get('storm_control_level') %}
- storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}
+ {%- set _ = config_lines.append(' storm-control broadcast level ' ~ intf._custom_field_data.get('storm_control_level')) -%}
  {%- endif %}
  {%- if intf._custom_field_data.get('portfast') %}
- spanning-tree portfast
+ {%- set _ = config_lines.append(' spanning-tree portfast') -%}
  {%- endif %}
  {%- if intf._custom_field_data.get('bpduguard') %}
- spanning-tree bpduguard enable
+ {%- set _ = config_lines.append(' spanning-tree bpduguard enable') -%}
  {%- endif %}
  {%- if intf._custom_field_data.get('dhcp_snooping_limit') %}
- ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
+ {%- set _ = config_lines.append(' ip dhcp snooping limit rate ' ~ intf._custom_field_data.get('dhcp_snooping_limit')) -%}
  {%- endif %}
 {%- elif intf.mode == 'TAGGED_ALL' or intf.name.startswith('Port-channel') or intf.name == 'GigabitEthernet2' %}
- switchport trunk native vlan 1000
+ {%- set _ = config_lines.append(' switchport trunk native vlan 1000') -%}
  {%- if intf.tagged_vlans %}
- switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
+ {%- set _ = config_lines.append(' switchport trunk allowed vlan ' ~ (intf.tagged_vlans | map(attribute='vid') | sort | join(','))) -%}
  {%- else %}
- switchport trunk allowed vlan 2,102,1000
+ {%- set _ = config_lines.append(' switchport trunk allowed vlan 2,102,1000') -%}
  {%- endif %}
- switchport mode trunk
- switchport nonegotiate
+ {%- set _ = config_lines.append(' switchport mode trunk') -%}
+ {%- set _ = config_lines.append(' switchport nonegotiate') -%}
  {%- if intf.name in ['TenGigabitEthernet1/1/3', 'TenGigabitEthernet1/1/4'] %}
- channel-group 1 mode active
+ {%- set _ = config_lines.append(' channel-group 1 mode active') -%}
  {%- endif %}
  {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
- ip dhcp snooping trust
+ {%- set _ = config_lines.append(' ip dhcp snooping trust') -%}
  {%- endif %}
- {{ render_storm_control(intf) }}
+ {%- set _ = config_lines.append(' ' ~ render_storm_control(intf)) -%}
 {%- endif %}
 {%- if not intf.enabled %}
- shutdown
+{%- set _ = config_lines.append(' shutdown') -%}
 {%- endif %}
-!
+{%- set _ = config_lines.append('!') -%}
+{{ config_lines | join('') }}
 {%- endfor -%}
