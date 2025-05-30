@@ -1,0 +1,30 @@
+{#- common/cisco/storm_control.j2: Macro for storm-control configuration -#}
+{%- macro storm(data, is_trunk=false) -%}
+ {#-
+   Generates storm-control configuration.
+   Args:
+     data (dict): Custom field data for the interface.
+     is_trunk (bool): True for trunk interfaces, False for access.
+ -#}
+ {%- set cf_data = data if data is mapping else {} -%}
+ {%- set level = cf_data.get('storm_control_level') -%}
+ {%- set action_val = cf_data.get('storm_control_action') -%}
+
+ {%- if is_trunk %}
+ {#- Trunk: Include 'bps', default level to '20m', and action -#}
+ storm-control broadcast level bps {{ level if (level and level|string|trim != '') else '20m' }}
+ {%- set act = action_val if action_val else ['shutdown'] %}
+ {%- if act is string %}
+ storm-control action {{ act if act else 'shutdown' }}
+ {%- elif act and act is iterable and act[0] %}
+ storm-control action {{ act[0] if act[0] else 'shutdown' }}
+ {%- else %}
+ storm-control action shutdown
+ {%- endif %}
+ {%- else %}
+ {#- Access: Only include level if specified, no 'bps' or action -#}
+ {%- if level and level|string|trim != '' %}
+ storm-control broadcast level {{ level }}
+ {%- endif %}
+ {%- endif %}
+{%- endmacro -%}
