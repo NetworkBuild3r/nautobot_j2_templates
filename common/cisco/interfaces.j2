@@ -47,14 +47,12 @@ interface {{ intf.name }}
   {% if intf._custom_field_data.get('dhcp_snooping_limit') %}
  ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
   {% endif %}
-{% elif intf.mode == 'TAGGED_ALL' or intf.lag %}
+{% elif intf.mode.startswith('TAGGED') or intf.lag %}
   {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
   {% endif %}
   {% if intf.tagged_vlans %}
  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
-  {% else %}
- switchport trunk allowed vlan 2,102,1000
   {% endif %}
  switchport mode trunk
  switchport nonegotiate
