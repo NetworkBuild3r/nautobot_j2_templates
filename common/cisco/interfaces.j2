@@ -1,4 +1,5 @@
 {%- macro render_storm_control(intf) -%}
+{#- Debug: Using updated render_storm_control macro (May 30, 2025) to ensure storm-control commands are on the same line -#}
 {%- set level_cmd = '' -%}
 {%- if intf._custom_field_data.get('storm_control_level') %}
 {%- set level_cmd = 'storm-control broadcast level bps ' ~ intf._custom_field_data.get('storm_control_level') -%}
