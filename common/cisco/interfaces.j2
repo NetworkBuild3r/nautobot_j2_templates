@@ -49,17 +49,13 @@ interface {{ intf.name }}
  description {{ intf.description }}
  {%- endif %}
 
- {#- IP Address Configuration: Dynamic netmask calculation -#}
+ {#- IP Address Configuration: Use cidr_to_netmask filter -#}
  {%- if intf.ip_addresses and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address %}
  {%- set ip_network_obj = intf.ip_addresses[0].address %}
  {%- set ip_parts = ip_network_obj.split('/') %}
  {%- set ip_address = ip_parts[0] %}
  {%- set prefix_length = ip_parts[1] | int %}
- {%- set netmask = '0.0.0.0' %}
- {%- if prefix_length > 0 %}
- {%- set netmask = ((2**32 - 2**(32 - prefix_length)) | format('0>32b')) | regex_replace('(.{8})(.{8})(.{8})(.{8})', r'\1.\2.\3.\4') | regex_replace('0', '0') | regex_replace('1', '1') %}
- {%- set netmask = netmask | regex_replace('0', '0') | regex_replace('1', '255') %}
- {%- endif %}
+ {%- set netmask = prefix_length | cidr_to_netmask %}
  ip address {{ ip_address }} {{ netmask }}
  {%- endif %}
 
