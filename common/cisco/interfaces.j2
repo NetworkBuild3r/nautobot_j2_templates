@@ -64,7 +64,10 @@ channel-group {{ intf.lag.name | replace('Port-channel', '') }} mode active
  ip dhcp snooping trust
   {% endif %}
 {% endif %}
-{% if not intf.enabled %}
+{# Emit shutdown or no shutdown based on enabled flag #}
+{% if intf.enabled %}
+ no shutdown
+{% else %}
  shutdown
 {% endif %}
 !
