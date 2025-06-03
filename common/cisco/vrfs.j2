@@ -1,5 +1,7 @@
+{% set vrfs = host.vrfs or [] -%}
+{% if vrfs | length > 0 -%}
 !
-{% for vrf in host.vrfs %}
+{% for vrf in vrfs %}
 vrf definition {{ vrf.name }}
   address-family ipv4
   exit-address-family
@@ -7,3 +9,4 @@ vrf definition {{ vrf.name }}
   exit-address-family
 {% endfor %}
 !
+{% endif %}

@@ -1,20 +1,18 @@
-{%- set stp = host.config_context.get('stp') if host.config_context is defined else {} %}
+{%- set stp = host.config_context.get('stp', {}) -%}
 !
-{%- if stp and stp.get('mode') %}
+{%- if stp.mode %}
 spanning-tree mode {{ stp.mode }}
-    %
 {%- else %}
 spanning-tree mode mst
 {%- endif %}
 spanning-tree extend system-id
-{%- if stp and stp.get('mode') == 'mst' %}
-spanning-tree mst 0 priority {{ stp.get('priority', 61440) }}
+{%- if stp.mode == 'mst' %}
+spanning-tree mst 0 priority {{ stp.priority | default(61440) }}
 {%- else %}
-spanning-tree vlan 1-4094 priority {{ stp.get('priority', 61440) }}
+spanning-tree vlan 1-4094 priority {{ stp.priority | default(61440) }}
 {%- endif %}
 !
 errdisable recovery cause udld
 errdisable recovery cause bpduguard
 errdisable recovery cause storm-control
 errdisable recovery interval 900
-!

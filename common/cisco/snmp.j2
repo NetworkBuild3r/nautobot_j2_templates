@@ -1,41 +1,4 @@
 ! SNMP
-! SNMP Community Strings:
-{% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}
-snmp-server community {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", comm['secret_group']) | first | get_secret_by_secret_group_name(comm['secret_name']) | default("<SNMP_COMMUNITY>") }}{% endraw %} {{ comm['permission'] }} {{ comm['timeout'] }}
-{% endfor %}
-
-! SNMP Trap Source, Contact, and Location:
-snmp-server trap-source {{ host.config_context['cisco_snmp_ios']['snmp']['trap_source'] }}
-snmp-server contact "{{ host.config_context['cisco_snmp_ios']['snmp']['contact'] }}"
-
-{# Build SNMP location dynamically from location, rack-group, and rack #}
-{% set rack = host.get('rack') %}
-{% set loc  = host.location.name if host.location is mapping else host.location %}
-{% set rack_group = rack.rack_group.name if rack and rack.rack_group else '' %}
-{% set rack_name  = rack.name if rack else '' %}
-snmp-server location {{ loc }}{% if rack_group %} {{ rack_group }}{% endif %}{% if rack_name %} Rack {{ rack_name }}{% endif %}
-
-{# ACLs for SNMP #}
-{% for acl_number in ['51', '60'] %}
-  {% set acl_key = 'acl_' ~ acl_number %}
-  {% if acl_key in host.config_context['cisco_snmp_ios']['snmp'] %}
-ip access-list standard {{ acl_number }}
-  {% for rule in host.config_context['cisco_snmp_ios']['snmp'][acl_key] %}
-    {{ rule }}
-  {% endfor %}
-  {% endif %}
-{% endfor %}
-
-! Enabled SNMP Traps:
-{% for trap in host.config_context['cisco_snmp_ios']['snmp']['enable_traps'] %}
-snmp-server enable traps {{ trap }}
-{% endfor %}
-
-! SNMP Host Entries:
-{% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] %}
-snmp-server host {{ entry['ip'] }} {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", entry['secret_group']) | first | get_secret_by_secret_group_name(entry['secret_name']) | default("<SNMP_COMMUNITY>") }}{% endraw %}
-{% endfor %}
-
 ip access-list standard SNMP_ACCESS_ACL
  10 remark "DNA Center"
  10 permit 10.9.126.84
@@ -54,3 +17,30 @@ ip access-list standard SNMP_ACCESS_ACL
  80 remark "SCA Cisco Prime"
  80 permit 10.9.64.22
  90 deny   any log
+
+! SNMP Community Strings:
+{% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}
+snmp-server community {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", comm['secret_group']) | first | get_secret_by_secret_group_name(comm['secret_name']) | default("<SNMP_COMMUNITY>") }}{% endraw %} {{ comm['permission'] }} SNMP_ACCESS_ACL
+{% endfor %}
+
+! SNMP Trap Source, Contact, and Location:
+snmp-server trap-source {{ host.config_context['cisco_snmp_ios']['snmp']['trap_source'] }}
+snmp-server contact "{{ host.config_context['cisco_snmp_ios']['snmp']['contact'] }}"
+
+{# Build SNMP location dynamically from location and rack #}
+{% set rack = host.rack %}
+{% set loc = host.location.name if host.location else '' %}
+{% set rack_group = rack.rack_group.name if rack and rack.rack_group else '' %}
+{% set rack_name = rack.name if rack else '' %}
+snmp-server location {{ loc }}{% if rack_group %} {{ rack_group }}{% endif %}{% if rack_name %} Rack {{ rack_name }}{% endif %}
+
+! Enabled SNMP Traps:
+{% for trap in host.config_context['cisco_snmp_ios']['snmp']['enable_traps'] %}
+snmp-server enable traps {{ trap }}
+{% endfor %}
+
+! SNMP Host Entries:
+{% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] %}
+snmp-server host {{ entry['ip'] }} {% raw %}{{ host.config_context.secrets_groups | selectattr("name", "equalto", entry['secret_group']) | first | get_secret_by_secret_group_name(entry['secret_name']) | default("<SNMP_COMMUNITY>") }}{% endraw %}
+{% endfor %}
+
