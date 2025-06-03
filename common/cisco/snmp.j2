@@ -42,4 +42,5 @@
      ! SNMP Host Entries:
      {% for entry in host.config_context.cisco_snmp_ios.snmp.hosts %}
      snmp-server host {{ entry.ip }} {% raw %}{{ secrets_groups | selectattr('name', 'equalto', '{{ entry.secret_group }}') | first | get_secret_by_secret_group_name('community') | default('<SNMP_COMMUNITY>') }}{% endraw %}
+
      {% endfor %}
