@@ -1,39 +1,45 @@
 ! SNMP
-ip access-list standard SNMP_ACCESS_ACL
- 10 remark "DNA Center"
- 10 permit 10.9.126.84
- 20 remark "DNA Center"
- 20 permit 10.9.126.87
- 30 remark "DNA Center"
- 30 permit 10.9.126.81
- 40 remark "DNA Center"
- 40 permit 10.9.126.82
- 50 remark "GBSA SevOne Pollers"
- 50 permit 10.100.55.0 0.0.0.15
- 60 remark "PEDC SevOne Pollers"
- 60 permit 10.100.55.16 0.0.0.15
- 70 remark "PEDC Cisco Prime"
- 70 permit 10.1.100.111
- 80 remark "SCA Cisco Prime"
- 80 permit 10.9.64.22
- 90 deny   any log
+     ip access-list standard SNMP_ACCESS_ACL
+      10 remark "DNA Center"
+      10 permit 10.9.126.84
+      20 remark "DNA Center"
+      20 permit 10.9.126.87
+      30 remark "DNA Center"
+      30 permit 10.9.126.81
+      40 remark "DNA Center"
+      40 permit 10.9.126.82
+      50 remark "GBSA SevOne Pollers"
+      50 permit 10.100.55.0 0.0.0.15
+      60 remark "PEDC SevOne Pollers"
+      60 permit 10.100.55.16 0.0.0.15
+      70 remark "PEDC Cisco Prime"
+      70 permit 10.1.100.111
+      80 remark "SCA Cisco Prime"
+      80 permit 10.9.64.22
+      90 deny   any log
 
-! SNMP Community Strings:
-{% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {% raw %}{{ secrets_groups | selectattr('name', 'equalto', '{{ comm.secret_group }}') | first | get_secret_by_secret_group_name('community') | default('<SNMP_COMMUNITY>') }}{% endraw %} {{ comm.permission }} SNMP_ACCESS_ACL
-{% endfor %}
+     ! Define location_parts at the top
+     {% set loc = host.location.name | default('') %}
+     {% set rack_group = host.rack.rack_group.name | default('') if host.rack and host.rack.rack_group else '' %}
+     {% set rack_name = host.rack.name | default('') if host.rack else '' %}
+     {% set location_parts = [loc, rack_group, ('Rack ' ~ rack_name) if rack_name else ''] | select('ne', '') | list %}
 
-! SNMP Trap Source, Contact, and Location:
-snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
-snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
-snmp-server location {{ location_parts | join(' ') | default('Unknown') }}
+     ! SNMP Community Strings:
+     {% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
+     snmp-server community {% raw %}{{ secrets_groups | selectattr('name', 'equalto', '{{ comm.secret_group }}') | first | get_secret_by_secret_group_name('community') | default('<SNMP_COMMUNITY>') }}{% endraw %} {{ comm.permission }} SNMP_ACCESS_ACL
+     {% endfor %}
 
-! Enabled SNMP Traps:
-{% for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}
-snmp-server enable traps {{ trap }}
-{% endfor %}
+     ! SNMP Trap Source, Contact, and Location:
+     snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
+     snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
+     snmp-server location {{ location_parts | join(' ') | default('Unknown') }}
 
-! SNMP Host Entries:
-{% for entry in host.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ entry.ip }} {% raw %}{{ secrets_groups | selectattr('name', 'equalto', '{{ entry.secret_group }}') | first | get_secret_by_secret_group_name('community') | default('<SNMP_COMMUNITY>') }}{% endraw %}
-{% endfor %}
+     ! Enabled SNMP Traps:
+     {% for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}
+     snmp-server enable traps {{ trap }}
+     {% endfor %}
+
+     ! SNMP Host Entries:
+     {% for entry in host.config_context.cisco_snmp_ios.snmp.hosts %}
+     snmp-server host {{ entry.ip }} {% raw %}{{ secrets_groups | selectattr('name', 'equalto', '{{ entry.secret_group }}') | first | get_secret_by_secret_group_name('community') | default('<SNMP_COMMUNITY>') }}{% endraw %}
+     {% endfor %}
