@@ -20,14 +20,12 @@ ip access-list standard SNMP_ACCESS_ACL
 
 ! SNMP Community Strings:
 {% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}
-snmp-server community {{
-    ("{% raw %}{{ host.config_context.secrets_groups
-        | selectattr('name','equalto','%s')
-        | first
-        | get_secret_by_secret_group_name('%s')
-        | default('<SNMP_COMMUNITY>') }}{% endraw %}")
-    | format(comm['secret_group'], comm['secret_name'])
-}} {{ comm['permission'] }} SNMP_ACCESS_ACL
+{%   set raw_snmp_comm = "{% raw %}{{ host.config_context.secrets_groups\n"
+                          ~ "    | selectattr('name','equalto','" ~ comm['secret_group'] ~ "')\n"
+                          ~ "    | first\n"
+                          ~ "    | get_secret_by_secret_group_name('" ~ comm['secret_name'] ~ "')\n"
+                          ~ "    | default('<SNMP_COMMUNITY>') }}{% endraw %}" %}
+snmp-server community {{ raw_snmp_comm }} {{ comm['permission'] }} SNMP_ACCESS_ACL
 {% endfor %}
 
 ! SNMP Trap Source, Contact, and Location:
@@ -36,9 +34,10 @@ snmp-server contact "{{ host.config_context['cisco_snmp_ios']['snmp']['contact']
 
 {# Build SNMP location dynamically with defensive checks #}
 {% set loc        = host.location.name | default('') %}
-{% set rack_group = host.rack.rack_group.name | default('') if host.rack and host.rack.rack_group else '' %}
+{% set rack_group = host.rack.rack_group.name | default('')
+     if host.rack and host.rack.rack_group else '' %}
 {% set rack_name  = host.rack.name | default('')      if host.rack else '' %}
-{% set location_parts = [loc, rack_group, (('Rack ' ~ rack_name) if rack_name else '')]
+{% set location_parts = [loc, rack_group, ('Rack ' ~ rack_name) if rack_name else '']
      | select('ne','')
      | list
 %}
@@ -51,12 +50,10 @@ snmp-server enable traps {{ trap }}
 
 ! SNMP Host Entries:
 {% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] %}
-snmp-server host {{ entry['ip'] }} {{
-    ("{% raw %}{{ host.config_context.secrets_groups
-        | selectattr('name','equalto','%s')
-        | first
-        | get_secret_by_secret_group_name('%s')
-        | default('<SNMP_COMMUNITY>') }}{% endraw %}")
-    | format(entry['secret_group'], entry['secret_name'])
-}}
+{%   set raw_snmp_host = "{% raw %}{{ host.config_context.secrets_groups\n"
+                           ~ "    | selectattr('name','equalto','" ~ entry['secret_group'] ~ "')\n"
+                           ~ "    | first\n"
+                           ~ "    | get_secret_by_secret_group_name('" ~ entry['secret_name'] ~ "')\n"
+                           ~ "    | default('<SNMP_COMMUNITY>') }}{% endraw %}" %}
+snmp-server host {{ entry['ip'] }} {{ raw_snmp_host }}
 {% endfor %}
