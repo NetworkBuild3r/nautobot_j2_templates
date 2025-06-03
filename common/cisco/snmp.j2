@@ -21,12 +21,12 @@ ip access-list standard SNMP_ACCESS_ACL
 ! SNMP Community Strings:
 {% for comm in host.config_context['cisco_snmp_ios']['snmp']['communities'] %}
 snmp-server community {{
-    "{% raw %}{{ host.config_context.secrets_groups
-        | selectattr('name', 'equalto', '%s')
+    ("{% raw %}{{ host.config_context.secrets_groups
+        | selectattr('name','equalto','%s')
         | first
         | get_secret_by_secret_group_name('%s')
-        | default('<SNMP_COMMUNITY>') }}{% endraw %}"
-    % (comm['secret_group'], comm['secret_name'])
+        | default('<SNMP_COMMUNITY>') }}{% endraw %}")
+    | format(comm['secret_group'], comm['secret_name'])
 }} {{ comm['permission'] }} SNMP_ACCESS_ACL
 {% endfor %}
 
@@ -38,8 +38,8 @@ snmp-server contact "{{ host.config_context['cisco_snmp_ios']['snmp']['contact']
 {% set loc        = host.location.name | default('') %}
 {% set rack_group = host.rack.rack_group.name | default('') if host.rack and host.rack.rack_group else '' %}
 {% set rack_name  = host.rack.name | default('')      if host.rack else '' %}
-{% set location_parts = [loc, rack_group, (('Rack ' + rack_name) if rack_name else '')]
-     | select('ne', '')
+{% set location_parts = [loc, rack_group, (('Rack ' ~ rack_name) if rack_name else '')]
+     | select('ne','')
      | list
 %}
 snmp-server location {{ location_parts | join(' ') | default('Unknown') }}
@@ -52,11 +52,11 @@ snmp-server enable traps {{ trap }}
 ! SNMP Host Entries:
 {% for entry in host.config_context['cisco_snmp_ios']['snmp']['hosts'] %}
 snmp-server host {{ entry['ip'] }} {{
-    "{% raw %}{{ host.config_context.secrets_groups
-        | selectattr('name', 'equalto', '%s')
+    ("{% raw %}{{ host.config_context.secrets_groups
+        | selectattr('name','equalto','%s')
         | first
         | get_secret_by_secret_group_name('%s')
-        | default('<SNMP_COMMUNITY>') }}{% endraw %}"
-    % (entry['secret_group'], entry['secret_name'])
+        | default('<SNMP_COMMUNITY>') }}{% endraw %}")
+    | format(entry['secret_group'], entry['secret_name'])
 }}
 {% endfor %}
