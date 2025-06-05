@@ -1,13 +1,22 @@
-{# Main template for Cisco XE access switches #}
-{% include 'common/cisco/hostname.j2' %}
-{% include 'common/cisco/common/cisco/global_settings.j2' %}
-{% include 'common/cisco/common/cisco/vrfs.j2' %}
-{% include 'common/cisco/common/cisco/aaa.j2' %}
-{% include 'common/cisco/common/cisco/interfaces.j2' %}
-{% include 'common/cisco/common/cisco/ios_snmp.j2' %}
-{% include 'common/cisco/common/cisco/ntp.j2' %}
-{% include 'common/cisco/common/cisco/syslog.j2' %}
-
-{# Access-specific configurations #}
-{% include 'access/access/management_svi.j2' %}
-{% include 'access/access/uplink_portchannel.j2' %}
+!
+{% include 'common/cisco/global_settings.j2' %}
+!
+{% include 'common/cisco/aaa.j2' %}
+!
+{% include 'common/cisco/dns.j2' %}
+!
+{% include 'common/cisco/vlans.j2' %}
+!
+{% include 'common/cisco/spanning_tree.j2' %}
+!
+{% include 'common/cisco/interfaces.j2' %}
+{% include 'common/cisco/snmp.j2' %}
+{% include 'common/cisco/banner.j2' %}
+!
+{% include 'common/cisco/vrfs.j2' %}
+!
+{% include 'common/cisco/line_configs.j2' %}
+!
+{% include 'common/cisco/ip_settings.j2' %}
+!
+{% include 'common/cisco/ntp_logging.j2' %}
