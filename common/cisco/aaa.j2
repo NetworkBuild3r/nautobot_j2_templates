@@ -3,76 +3,70 @@ aaa new-model
 {% endif %}
 
 {# Authentication #}
-{% if 'authentication' in host.config_context.aaa %}
-  {% for method, value in host.config_context.aaa.authentication.items() %}
-    {% if method == 'login' %}
-      {% for list_name, auth_method in value.items() %}
-aaa authentication login {{ list_name }} {{ auth_method }}
-      {% endfor %}
-    {% elif method in ['enable', 'dot1x', 'ppp'] %}
-aaa authentication {{ method }} default {{ value }}
-    {% elif method in ['banner', 'fail_message'] %}
-aaa authentication {{ method }} ^C{{ value }}^C
-    {% endif %}
-  {% endfor %}
+{% if host.config_context.aaa.authentication is defined %}
+{%   if host.config_context.aaa.authentication.dot1x is defined %}
+aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
+{%   endif %}
+{%   if host.config_context.aaa.authentication.login.console is defined %}
+aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
+{%   endif %}
+{%   if host.config_context.aaa.authentication.login.default is defined %}
+aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
+{%   endif %}
+{%   if host.config_context.aaa.authentication.enable is defined %}
+aaa authentication enable {{ host.config_context.aaa.authentication.enable }}
+{%   endif %}
 {% endif %}
 
 {# Authorization #}
-{% if 'authorization' in host.config_context.aaa %}
-  {% for type, value in host.config_context.aaa.authorization.items() %}
-    {% if type in ['exec', 'network', 'config_commands', 'reverse_access', 'auth_proxy'] %}
-aaa authorization {{ type }} default {{ value }}
-    {% elif type == 'commands' %}
-      {% for level, group in value.items() %}
-aaa authorization commands {{ level }} default {{ group }}
-      {% endfor %}
-    {% endif %}
-  {% endfor %}
+{% if host.config_context.aaa.authorization is defined %}
+{%   if host.config_context.aaa.authorization.exec is defined %}
+aaa authorization exec {{ host.config_context.aaa.authorization.exec }}
+{%   endif %}
+{%   if host.config_context.aaa.authorization.network is defined %}
+aaa authorization network {{ host.config_context.aaa.authorization.network }}
+{%   endif %}
+{%   if host.config_context.aaa.authorization.auth_proxy is defined %}
+aaa authorization auth_proxy {{ host.config_context.aaa.authorization.auth_proxy }}
+{%   endif %}
 {% endif %}
 
 {# Accounting #}
-{% if 'accounting' in host.config_context.aaa %}
-  {% for type, value in host.config_context.aaa.accounting.items() %}
-    {% if type in ['exec', 'network', 'system', 'connection', 'dot1x'] %}
-aaa accounting {{ type }} default {{ value }}
-    {% elif type == 'commands' %}
-      {% for level, cmd_value in value.items() %}
-aaa accounting commands {{ level }} default {{ cmd_value }}
-      {% endfor %}
-    {% endif %}
-  {% endfor %}
+{% if host.config_context.aaa.accounting is defined %}
+{%   if host.config_context.aaa.accounting.exec is defined %}
+aaa accounting exec {{ host.config_context.aaa.accounting.exec }}
+{%   endif %}
+{%   if host.config_context.aaa.accounting.commands['0'] is defined %}
+aaa accounting commands 0 {{ host.config_context.aaa.accounting.commands['0'] }}
+{%   endif %}
+{%   if host.config_context.aaa.accounting.commands['15'] is defined %}
+aaa accounting commands 15 {{ host.config_context.aaa.accounting.commands['15'] }}
+{%   endif %}
+aaa accounting delay-start all
+aaa accounting auth-proxy default start-stop group radius
+aaa accounting dot1x default start-stop group radius
+aaa accounting network default start-stop group radius
 {% endif %}
+aaa server radius dynamic-author
 
 {# Server Groups #}
-{% if 'server_groups' in host.config_context.aaa %}
-  {% for protocol, groups in host.config_context.aaa.server_groups.items() %}
-    {% for group_name, group_data in groups.items() %}
-aaa group server {{ protocol }} {{ group_name }}
-      {% for server in group_data.servers %}
+{% if host.config_context.aaa.server_groups is defined and host.config_context.aaa.server_groups['tacacs+'] is defined %}
+aaa group server tacacs+ default
+{%   for server in host.config_context.aaa.server_groups['tacacs+']['default']['servers'] %}
  server name {{ server.name }}
-      {% endfor %}
-    {% endfor %}
-  {% endfor %}
+{%   endfor %}
 {% endif %}
 
-{# TACACS+ Servers #}
-{% if 'tacacs_servers' in host.config_context.aaa %}
-  {% for server in host.config_context.aaa.tacacs_servers %}
+{# TACACS Servers #}
+{% if host.config_context.aaa.tacacs_servers is defined %}
+{%   for server in host.config_context.aaa.tacacs_servers %}
 tacacs server {{ server.name }}
  address ipv4 {{ server.ip_address }}
  key {% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name(server.name | lower | replace("-", "_") ~ "_key") | default("tacacs_key") }}{% endraw %}
-  {% endfor %}
+{%   endfor %}
 {% endif %}
 
-{# Miscellaneous #}
-{% if 'misc' in host.config_context.aaa %}
-  {% if 'session_id' in host.config_context.aaa.misc %}
+{# Misc #}
+{% if host.config_context.aaa.misc is defined and host.config_context.aaa.misc.session_id is defined %}
 aaa session-id {{ host.config_context.aaa.misc.session_id }}
-  {% endif %}
-  {% if 'update' in host.config_context.aaa.misc %}
-aaa accounting update {{ host.config_context.aaa.misc.update }}
-  {% endif %}
-  {% if 'deadtime' in host.config_context.aaa.misc %}
-tacacs-server deadtime {{ host.config_context.aaa.misc.deadtime }}
-  {% endif %}
 {% endif %}

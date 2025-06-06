@@ -1,9 +1,8 @@
 {% macro render_storm_control(intf) %}
-{# Debug: storm-control commands on separate lines #}
 {% if intf._custom_field_data.get('storm_control_level') %}
-storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
+ storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
 {% else %}
-storm-control broadcast level bps 20m
+ storm-control broadcast level bps 40m
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_action') %}
   {% set action_val = intf._custom_field_data.get('storm_control_action') %}
@@ -15,10 +14,10 @@ storm-control broadcast level bps 20m
     {% set action = none %}
   {% endif %}
   {% if action and action != 'drop' %}
-storm-control action {{ action }}
+ storm-control action {{ action }}
   {% endif %}
 {% else %}
-storm-control action shutdown
+ storm-control action shutdown
 {% endif %}
 {% endmacro %}
 
@@ -31,12 +30,25 @@ interface {{ intf.name }}
  ip address {{ intf.ip_addresses[0].address.split('/') [0] }} {{ intf.ip_addresses[0].address.split('/') [1] | int | cidr_to_netmask }}
 {% endif %}
 {% if intf.mode == 'ACCESS' %}
-  {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
- switchport access vlan {{ intf.untagged_vlan.vid }}
-  {% endif %}
  switchport mode access
+  {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
+    {% if intf.untagged_vlan.vid == 1 %}
+ switchport access vlan 1000
+    {% else %}
+ switchport access vlan {{ intf.untagged_vlan.vid }}
+    {% endif %}
+  {% endif %}
+  {% if intf._custom_field_data.get('cf_voice_vlan') %}
+    {% if intf._custom_field_data.get('cf_voice_vlan') == '1' %}
+ switchport voice vlan 1000
+    {% else %}
+ switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
+    {% endif %}
+  {% endif %}
   {% if intf._custom_field_data.get('storm_control_level') %}
  storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
+  {% else %}
+ storm-control broadcast level bps 40m
   {% endif %}
   {% if intf._custom_field_data.get('portfast') %}
  spanning-tree portfast
@@ -47,24 +59,33 @@ interface {{ intf.name }}
   {% if intf._custom_field_data.get('dhcp_snooping_limit') %}
  ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
   {% endif %}
+  {% if intf._custom_field_data.get('dhcp_snooping_trust') %}
+ ip dhcp snooping trust
+  {% endif %}
 {% elif intf.tagged_vlans or intf.lag %}
   {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
+    {% if intf.untagged_vlan.vid == 1 %}
+ switchport trunk native vlan 1000
+    {% else %}
  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+    {% endif %}
   {% endif %}
   {% if intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
- switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
+    {% set filtered_vlans = intf.tagged_vlans | rejectattr('vid', 'equalto', 1) | list %}
+    {% if filtered_vlans | length > 0 %}
+ switchport trunk allowed vlan {{ filtered_vlans | map(attribute='vid') | sort | join(',') }}
+    {% endif %}
   {% endif %}
  switchport mode trunk
  switchport nonegotiate
  {{ render_storm_control(intf) }}
   {% if intf.lag and intf.lag.name %}
-channel-group {{ intf.lag.name | replace('Port-channel', '') }} mode active
+ channel-group {{ intf.lag.name | replace('Port-channel', '') }} mode active
   {% endif %}
   {% if intf._custom_field_data.get('dhcp_snooping_trust') %}
  ip dhcp snooping trust
   {% endif %}
 {% endif %}
-{# Emit shutdown or no shutdown based on enabled flag #}
 {% if intf.enabled %}
  no shutdown
 {% else %}

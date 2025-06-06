@@ -1,5 +1,5 @@
 !
-ip default-gateway {{ host.config_context.site_pedc.default_gateway }}
+ip default-gateway {{ host.config_context.site_pedc.default_gateway | default("10.4.1.1") }}
 ip http server
 ip http authentication local
 ip http secure-server

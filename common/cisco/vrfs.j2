@@ -1,5 +1,5 @@
-{% set vrfs = host.vrfs or [] -%}
-{% if vrfs | length > 0 -%}
+{% set vrfs = host.vrfs or [] %}
+{% if vrfs | length > 0 %}
 !
 {% for vrf in vrfs %}
 vrf definition {{ vrf.name }}

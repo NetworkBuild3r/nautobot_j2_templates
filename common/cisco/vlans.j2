@@ -1,15 +1,50 @@
-{% set vlans = [] %}
-{% for intf in host.interfaces %}
-  {% if intf.untagged_vlan and intf.untagged_vlan not in vlans %}
-    {% set _ = vlans.append(intf.untagged_vlan) %}
-  {% endif %}
-  {% for vlan in intf.tagged_vlans %}
-    {% if vlan not in vlans %}
-      {% set _ = vlans.append(vlan) %}
-    {% endif %}
-  {% endfor %}
-{% endfor %}
-{% for vlan in vlans | unique(attribute='vid') | sort(attribute='vid') %}
+{# Initialize lists for VLANs and VIDs #}
+{%- set vlan_list = [] -%}
+{%- set vid_set = [] -%}
+{%- set voice_vids = [] -%}
+
+{# Collect Voice VLANs from custom field and avoid duplicates #}
+{%- for intf in host.interfaces -%}
+  {%- set cf = intf.get('_custom_field_data', {}) -%}
+  {%- set voice = cf.get('cf_voice_vlan') -%}
+  {%- if voice is not none and voice not in voice_vids -%}
+    {%- set _ = voice_vids.append(voice) -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{# Collect untagged and tagged VLANs and avoid duplicates #}
+{%- for intf in host.interfaces -%}
+  {%- if intf.untagged_vlan -%}
+    {%- set untag = intf.untagged_vlan -%}
+    {%- if untag.vid not in vid_set and untag.vid != 1 -%}
+      {%- set _ = vid_set.append(untag.vid) -%}
+      {%- set _ = vlan_list.append({'vid': untag.vid, 'name': untag.name}) -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- for vlan in intf.tagged_vlans -%}
+    {%- if vlan.vid not in vid_set and vlan.vid != 1 -%}
+      {%- set _ = vid_set.append(vlan.vid) -%}
+      {%- set _ = vlan_list.append({'vid': vlan.vid, 'name': vlan.name}) -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endfor -%}
+
+{# Add voice VLANs if not already present #}
+{%- for vid in voice_vids -%}
+  {%- if vid not in vid_set and vid != '1' -%}
+    {%- set _ = vid_set.append(vid) -%}
+    {%- set _ = vlan_list.append({'vid': vid, 'name': 'VOICE-' ~ vid}) -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{# Render VLANs #}
+{%- for vlan in vlan_list | sort(attribute='vid') -%}
 vlan {{ vlan.vid }}
   name {{ vlan.name }}
 {% endfor %}
+
+{# Render dhcp snooping only for valid VLANs #}
+{% if vlan_list %}
+ip dhcp snooping vlan {{ vlan_list | map(attribute='vid') | sort | join(',') }}
+{% endif %}

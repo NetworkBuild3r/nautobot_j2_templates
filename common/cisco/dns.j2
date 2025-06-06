@@ -2,3 +2,8 @@
 {{ dns }}
 {% endfor %}
 ip domain lookup source-interface {{ host.config_context.syslog.source_interface }}
+no ip dhcp snooping information option
+ip dhcp snooping
+login on-success log
+ipv6 unicast-routing
+!
