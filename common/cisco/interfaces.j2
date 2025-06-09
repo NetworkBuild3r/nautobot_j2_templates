@@ -1,33 +1,35 @@
 ! Interfaces
 {% for intf in interfaces | default([]) | sort(attribute='name') %}
-{% if intf.name is defined and intf.name %}
+{%- if intf.name is defined and intf.name and not intf.name.startswith('Stack Port') %}
 interface {{ intf.name }}
- {%- if intf.description is defined and intf.description | string | length > 0 -%}
+ {% if intf.description is defined and intf.description | string | length > 0 %}
  description {{ intf.description }}
- {%- elif intf.name.startswith('Port-channel') and intf._custom_field_data is defined and intf.lag is not defined %}
-  {%- set uplink_interfaces = interfaces | selectattr('lag', 'defined') | selectattr('lag.name', 'equalto', intf.name) | list %}
-  {%- if uplink_interfaces | length > 0 %}
- description UPLINK to {{ uplink_interfaces[0].description | default('') | replace('Uplink to ', '') }}({{ uplink_interfaces | map(attribute='name') | join(', ') }})
+ {% elif intf.name.startswith('Port-channel') %}
+  {% set uplink_interfaces = interfaces | selectattr('lag', 'defined') | selectattr('lag.name', 'equalto', intf.name) | list %}
+  {% if uplink_interfaces | length > 0 %}
+ description UPLINK to {{ uplink_interfaces[0].description | default('unknown') | replace('Uplink to ', '') }}({{ uplink_interfaces | map(attribute='name') | join(', ') }})
   {% endif %}
  {% endif %}
 
- {%- if intf.ip_addresses is defined and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address is defined %}
-  {%- set ip_parts = intf.ip_addresses[0].address.split('/') %}
-  {%- if ip_parts | length == 2 %}
-   {%- set ip = ip_parts[0] %}
-   {%- set prefix = ip_parts[1] | int %}
-   {%- if prefix >= 0 and prefix <= 32 %}
+ {% if intf.ip_addresses is defined and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address is defined %}
+  {% set ip_parts = intf.ip_addresses[0].address.split('/') %}
+  {% if ip_parts | length == 2 %}
+   {% set ip = ip_parts[0] %}
+   {% set prefix = ip_parts[1] | int %}
+   {% if prefix >= 0 and prefix <= 32 %}
  ip address {{ ip }} {{ prefix | cidr_to_netmask }}
    {% endif %}
   {% endif %}
  {% endif %}
- {%- if intf.vrf is defined and intf.vrf and intf.vrf.name is defined and intf.vrf.name | string | length > 0 %}
+
+ {% if intf.vrf is defined and intf.vrf and intf.vrf.name is defined and intf.vrf.name | string | length > 0 %}
  vrf forwarding {{ intf.vrf.name }}
  {% endif %}
- {%- set defaults = host.config_context.access_switch_defaults.interface_defaults | default({}) %}
- {%- set custom = intf._custom_field_data | default({}) %}
- {%- if intf.mode is defined and intf.mode %}
-  {% if intf.mode == 'ACCESS' and (intf.untagged_vlan is defined or defaults.access_vlan is defined) and not intf.name.startswith('Port-channel') %}
+
+ {% set defaults = host.config_context.access_switch_defaults.interface_defaults | default({}) %}
+ {% set custom = intf._custom_field_data | default({}) %}
+ {% if intf.mode is defined and intf.mode %}
+  {% if intf.mode == 'ACCESS' and not intf.name.startswith('Port-channel') %}
    {% if intf.untagged_vlan is defined and intf.untagged_vlan.vid is defined and intf.untagged_vlan.vid | int >= 1 and intf.untagged_vlan.vid | int <= 4094 %}
  switchport access vlan {{ intf.untagged_vlan.vid }}
    {% elif defaults.access_vlan is defined and defaults.access_vlan | int >= 1 and defaults.access_vlan | int <= 4094 %}
