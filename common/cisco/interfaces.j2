@@ -1,102 +1,82 @@
 {% for intf in interfaces | default([]) | sort(attribute='name') %}
 {% if intf.name and not intf.name.startswith('Stack Port') %}
 interface {{ intf.name }}
-{% if intf.description %}
- description {{ intf.description }}
-{% elif intf.name.startswith('Port-channel') %}
-  {%- set uplink_interfaces = interfaces
-      | selectattr('lag', 'defined')
-      | select('ne', None)
-      | selectattr('lag.name', 'defined')
-      | selectattr('lag.name', 'equalto', intf.name)
-      | list %}
-  {% if uplink_interfaces %}
- description UPLINK to {{ uplink_interfaces[0].description
-     | default('unknown')
-     | replace('Uplink to ', '') }}
- ({{ uplink_interfaces | map(attribute='name') | join(', ') }})
+
+{# Description or uplink #}
+{% set desc = intf.description | string | trim %}
+{% set uplinks = interfaces | selectattr('lag.name', 'equalto', intf.name) | list %}
+{% if desc %}
+ description {{ desc }}
+{% elif uplinks %}
+ description UPLINK to {{ uplinks[0].description | default('unknown') | replace('Uplink to ', '') }} ({{ uplinks | map(attribute='name') | join(', ') }})
+{% endif %}
+
+{# IP Address #}
+{% if intf.ip_addresses and intf.ip_addresses[0].address is defined %}
+  {% set parts = intf.ip_addresses[0].address.split('/') %}
+  {% if parts | length == 2 %}
+ ip address {{ parts[0] }} {{ parts[1] | int | cidr_to_netmask }}
   {% endif %}
 {% endif %}
 
-{% if intf.ip_addresses
-    and intf.ip_addresses[0].address is defined %}
-  {%- set ip_parts = intf.ip_addresses[0].address.split('/') -%}
-  {% if ip_parts|length == 2 %}
- ip address {{ ip_parts[0] }} {{ ip_parts[1] | int | cidr_to_netmask }}
-  {% endif %}
-{% endif %}
-
+{# VRF forward #}
 {% if intf.vrf and intf.vrf.name %}
  vrf forwarding {{ intf.vrf.name }}
 {% endif %}
 
+{# Defaults and custom fields #}
 {% set defaults = host.config_context.access_switch_defaults.interface_defaults | default({}) %}
 {% set custom = intf._custom_field_data | default({}) %}
 
-{# Mode and VLAN config #}
+{# Mode/VLAN config #}
 {% if intf.mode %}
-  {% if intf.mode == 'ACCESS' and not intf.name.startswith('Port-channel') %}
- switchport access vlan {{
-   (intf.untagged_vlan.vid
-     if intf.untagged_vlan and intf.untagged_vlan.vid
-     else defaults.access_vlan)
- }}
+  {% if intf.mode == 'ACCESS' %}
  switchport mode access
+ switchport access vlan {{ (intf.untagged_vlan.vid if intf.untagged_vlan and intf.untagged_vlan.vid is defined else defaults.access_vlan) }}
   {% else %}
- switchport trunk native vlan {{
-   (intf.untagged_vlan.vid
-     if intf.untagged_vlan and intf.untagged_vlan.vid
-     else defaults.access_vlan)
- }}
- switchport trunk allowed vlan {{
-   interfaces
-     | selectattr('tagged_vlans', 'defined')
-     | map(attribute='tagged_vlans')
-     | sum(start=[])
-     | map(attribute='vid')
-     | map('int')
-     | select('ge', 1)
-     | select('le', 4094)
-     | sort
-     | join(',')
- }}
  switchport mode trunk
+ switchport trunk native vlan {{ (intf.untagged_vlan.vid if intf.untagged_vlan and intf.untagged_vlan.vid is defined else defaults.access_vlan) }}
+ {% set trunk_list = intf.tagged_vlans | default([]) | map(attribute='vid') | select('defined') | map('int') | select('ge',1) | select('le',4094) | sort | join(',') %}
+ {% if trunk_list %}switchport trunk allowed vlan {{ trunk_list }}{% endif %}
  switchport nonegotiate
   {% endif %}
 {% endif %}
 
-{# Voice/VLAN enhancements #}
-{% if custom.cf_voice_vlan %}
- switchport voice vlan {{ custom.cf_voice_vlan }}
-{% endif %}
-{% if custom.portfast %}
- spanning-tree portfast
-{% endif %}
-{% if custom.bpduguard %}
- spanning-tree bpduguard enable
+{# Voice VLAN #}
+{% if custom.get('cf_voice_vlan') %}
+ switchport voice vlan {{ custom.get('cf_voice_vlan') }}
 {% endif %}
 
 {# Storm control #}
-{% if custom.storm_control_level %}
- storm-control broadcast level {{ custom.storm_control_level }}
+{% if custom.get('storm_control_level') %}
+ storm-control broadcast level bps {{ custom.get('storm_control_level') }}
 {% endif %}
-{% if custom.storm_control_action and custom.storm_control_action != 'drop' %}
- storm-control action {{ custom.storm_control_action }}
+{% if custom.get('storm_control_action') and custom.get('storm_control_action') | length > 0 and custom.get('storm_control_action')[0] != 'drop' %}
+ storm-control action {{ custom.get('storm_control_action')[0] }}
+{% endif %}
+
+{# Spanning-tree features #}
+{% if custom.get('portfast') %}
+ spanning-tree portfast
+{% endif %}
+{% if custom.get('bpduguard') %}
+ spanning-tree bpduguard enable
+{% endif %}
+
+{# DHCP snooping #}
+{% if custom.get('dhcp_snooping_limit') %}
+ ip dhcp snooping limit rate {{ custom.get('dhcp_snooping_limit') }}
+{% endif %}
+{% if custom.get('dhcp_snooping_trust') %}
+ ip dhcp snooping trust
 {% endif %}
 
 {# Channel-group #}
 {% if intf.lag and intf.lag.name and not intf.name.startswith('Port-channel') %}
- channel-group {{ intf.lag.name | replace('Port-channel', '') | int }} mode active
+ channel-group {{ intf.lag.name | replace('Port-channel','') | int }} mode active
 {% endif %}
 
-{# DHCP snooping #}
-{% if custom.dhcp_snooping_trust %}
- ip dhcp snooping trust
-{% endif %}
-{% if custom.dhcp_snooping_limit %}
- ip dhcp snooping limit rate {{ custom.dhcp_snooping_limit }}
-{% endif %}
-
+{# Enabled/shutdown #}
 {% if intf.enabled %}
  no shutdown
 {% else %}
