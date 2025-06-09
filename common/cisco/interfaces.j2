@@ -5,7 +5,7 @@ interface {{ intf.name }}
  {% if intf.description is defined and intf.description | string | length > 0 %}
  description {{ intf.description }}
  {% elif intf.name.startswith('Port-channel') %}
-  {% set uplink_interfaces = interfaces | selectattr('lag', 'defined') | selectattr('lag.name', 'equalto', intf.name) | list %}
+  {% set uplink_interfaces = interfaces | selectattr('lag', 'defined') | select('ne', None) | selectattr('lag.name', 'defined') | selectattr('lag.name', 'equalto', intf.name) | list %}
   {% if uplink_interfaces | length > 0 %}
  description UPLINK to {{ uplink_interfaces[0].description | default('unknown') | replace('Uplink to ', '') }}({{ uplink_interfaces | map(attribute='name') | join(', ') }})
   {% endif %}
