@@ -1,72 +1,143 @@
-{% if host.config_context.aaa.new_model | default(true) %}
+{# common/cisco/aaa.j2 #}
+
+{# — Always enable AAA if new_model is true (or default to true) — #}
+{% if host.config_context.aaa.new_model is defined and host.config_context.aaa.new_model %}
 aaa new-model
+
 {% endif %}
 
-{# Authentication #}
-{% if host.config_context.aaa.authentication is defined %}
-{%   if host.config_context.aaa.authentication.dot1x is defined %}
-aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x }}
-{%   endif %}
-{%   if host.config_context.aaa.authentication.login.console is defined %}
-aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
-{%   endif %}
-{%   if host.config_context.aaa.authentication.login.default is defined %}
-aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
-{%   endif %}
-{%   if host.config_context.aaa.authentication.enable is defined %}
-aaa authentication enable {{ host.config_context.aaa.authentication.enable }}
-{%   endif %}
+{# — AUTHENTICATION — #}
+{%- set auth = host.config_context.aaa.authentication or {} -%}
+
+{# dot1x:             “dot1x default <value>”     #}
+{% if auth.dot1x is defined %}
+aaa authentication dot1x default {{ auth.dot1x }}
 {% endif %}
 
-{# Authorization #}
-{% if host.config_context.aaa.authorization is defined %}
-{%   if host.config_context.aaa.authorization.exec is defined %}
-aaa authorization exec {{ host.config_context.aaa.authorization.exec }}
-{%   endif %}
-{%   if host.config_context.aaa.authorization.network is defined %}
-aaa authorization network {{ host.config_context.aaa.authorization.network }}
-{%   endif %}
-{%   if host.config_context.aaa.authorization.auth_proxy is defined %}
-aaa authorization auth_proxy {{ host.config_context.aaa.authorization.auth_proxy }}
-{%   endif %}
+{# login.console:     “login console <value>”      #}
+{% if auth.login is defined and auth.login.console is defined %}
+aaa authentication login console {{ auth.login.console }}
 {% endif %}
 
-{# Accounting #}
-{% if host.config_context.aaa.accounting is defined %}
-{%   if host.config_context.aaa.accounting.exec is defined %}
-aaa accounting exec {{ host.config_context.aaa.accounting.exec }}
-{%   endif %}
-{%   if host.config_context.aaa.accounting.commands['0'] is defined %}
-aaa accounting commands 0 {{ host.config_context.aaa.accounting.commands['0'] }}
-{%   endif %}
-{%   if host.config_context.aaa.accounting.commands['15'] is defined %}
-aaa accounting commands 15 {{ host.config_context.aaa.accounting.commands['15'] }}
-{%   endif %}
+{# login.default:     “login default <value>”      #}
+{% if auth.login is defined and auth.login.default is defined %}
+aaa authentication login default {{ auth.login.default }}
+{% endif %}
+
+{# enable:            “enable <value>”             #}
+{% if auth.enable is defined %}
+aaa authentication enable {{ auth.enable }}
+{% endif %}
+
+
+{# — AUTHORIZATION — #}
+{%- set authz = host.config_context.aaa.authorization or {} -%}
+
+{# exec:              “exec <value>”               #}
+{% if authz.exec is defined %}
+aaa authorization exec {{ authz.exec }}
+{% endif %}
+
+{# network:           “network <value>”            #}
+{% if authz.network is defined %}
+aaa authorization network {{ authz.network }}
+{% endif %}
+
+{# auth_proxy:        “auth_proxy <value>”         #}
+{% if authz.auth_proxy is defined %}
+aaa authorization auth_proxy {{ authz.auth_proxy }}
+{% endif %}
+
+{# reverse_access:    “reverse-access <value>”     #}
+{% if authz.reverse_access is defined %}
+aaa authorization reverse-access {{ authz.reverse_access }}
+{% endif %}
+
+{# config_commands:   “config-commands <value>”    #}
+{% if authz.config_commands is defined %}
+aaa authorization config-commands {{ authz.config_commands }}
+{% endif %}
+
+{# commands.0 / commands.15: “commands <level> <value>” #}
+{% if authz.commands is defined %}
+  {% for level, line in authz.commands.items() %}
+aaa authorization commands {{ level }} {{ line }}
+  {% endfor %}
+{% endif %}
+
+
+{# — ACCOUNTING — #}
+{%- set acct = host.config_context.aaa.accounting or {} -%}
+
+{# exec:              “exec <value>”               #}
+{% if acct.exec is defined %}
+aaa accounting exec {{ acct.exec }}
+{% endif %}
+
+{# commands.0 / commands.15: “commands <level> <value>” #}
+{% if acct.commands is defined %}
+  {% for level, line in acct.commands.items() %}
+aaa accounting commands {{ level }} {{ line }}
+  {% endfor %}
+{% endif %}
+
+{# dot1x:             “dot1x default <value>”      #}
+{% if acct.dot1x is defined %}
+aaa accounting dot1x default {{ acct.dot1x }}
+{% endif %}
+
+{# network:           “network default <value>”    #}
+{% if acct.network is defined %}
+aaa accounting network default {{ acct.network }}
+{% endif %}
+
+{# system:            “system default <value>”     #}
+{% if acct.system is defined %}
+aaa accounting system default {{ acct.system }}
+{% endif %}
+
+{# connection:        “connection default <value>” #}
+{% if acct.connection is defined %}
+aaa accounting connection default {{ acct.connection }}
+{% endif %}
+
+{# delay-start all is always included (not context-driven) — #}
 aaa accounting delay-start all
-aaa accounting auth-proxy default start-stop group radius
-aaa accounting dot1x default start-stop group radius
-aaa accounting network default start-stop group radius
+
+{# auth-proxy under accounting  (optional) — #}
+{% if acct.auth_proxy is defined %}
+aaa accounting auth-proxy default {{ acct.auth_proxy }}
 {% endif %}
+
+
+{# — RADIUS / TACACS SERVER OPTIONS — #}
+
+{# always include “aaa server radius dynamic-author” (not context-driven) — #}
 aaa server radius dynamic-author
 
-{# Server Groups #}
-{% if host.config_context.aaa.server_groups is defined and host.config_context.aaa.server_groups['tacacs+'] is defined %}
+
+{# — GROUP SERVER TACACS+ section — #}
+{%- set groups = host.config_context.aaa.server_groups or {} -%}
+{% if groups['tacacs+'] is defined and groups['tacacs+'].default.servers is defined %}
 aaa group server tacacs+ default
-{%   for server in host.config_context.aaa.server_groups['tacacs+']['default']['servers'] %}
- server name {{ server.name }}
-{%   endfor %}
+  {% for srv in groups['tacacs+'].default.servers %}
+ server name {{ srv.name }}
+  {% endfor %}
 {% endif %}
 
-{# TACACS Servers #}
-{% if host.config_context.aaa.tacacs_servers is defined %}
-{%   for server in host.config_context.aaa.tacacs_servers %}
-tacacs server {{ server.name }}
- address ipv4 {{ server.ip_address }}
- key {% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name(server.name | lower | replace("-", "_") ~ "_key") | default("tacacs_key") }}{% endraw %}
-{%   endfor %}
-{% endif %}
 
-{# Misc #}
-{% if host.config_context.aaa.misc is defined and host.config_context.aaa.misc.session_id is defined %}
+{# — TACACS SERVER ENTRIES — #}
+{%- set tacacs = host.config_context.aaa.tacacs_servers or [] -%}
+{% for s in tacacs %}
+tacacs server {{ s.name }}
+ address ipv4 {{ s.ip_address }}
+ key {% raw %}{{ secrets_group["name"]
+       | get_secret_by_secret_group_name(s.secret_group | lower | replace('-', '_'))
+       | default("tacacs_key") }}{% endraw %}
+{% endfor %}
+
+
+{# — MISC (e.g. session-id) — #}
+{% if host.config_context.aaa.misc is defined and host.config_context.aaa.misc.session_id %}
 aaa session-id {{ host.config_context.aaa.misc.session_id }}
 {% endif %}

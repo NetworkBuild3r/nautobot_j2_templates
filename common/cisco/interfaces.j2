@@ -1,96 +1,144 @@
-{% macro render_storm_control(intf) %}
-{% if intf._custom_field_data.get('storm_control_level') %}
- storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
-{% else %}
- storm-control broadcast level bps 40m
-{% endif %}
-{% if intf._custom_field_data.get('storm_control_action') %}
-  {% set action_val = intf._custom_field_data.get('storm_control_action') %}
-  {% if action_val is string %}
-    {% set action = action_val %}
-  {% elif action_val is iterable and action_val | length > 0 %}
-    {% set action = action_val[0] %}
-  {% else %}
-    {% set action = none %}
-  {% endif %}
-  {% if action and action != 'drop' %}
- storm-control action {{ action }}
-  {% endif %}
-{% else %}
- storm-control action shutdown
-{% endif %}
-{% endmacro %}
+! Interfaces
+{% for interface in host.interfaces | default([]) | sort(attribute='name') %}
+{%- if interface.name is defined and interface.name %}
+interface {{ interface.name }}
+  {# Description: Include if defined and non-empty, enhance for port-channel uplinks #}
+  {%- if interface.description is defined and interface.description | string | length > 0 %}
+  description {{ interface.description }}
+  {%- elif interface.name.startswith('Port-channel') and interface._custom_field_data is defined and interface.lag is not defined %}
+    {%- set uplink_interfaces = host.interfaces | selectattr('lag', 'defined') | selectattr('lag.name', 'equalto', interface.name) | list %}
+    {%- if uplink_interfaces | length > 0 %}
+  description UPLINK to {{ uplink_interfaces[0].description | default('unknown') | replace('Uplink to ', '') }}({{ uplink_interfaces | map(attribute='name') | join(', ') }})
+    {%- else %}
+  ! Warning: No uplink interfaces found for Port-channel {{ interface.name }}
+    {%- endif %}
+  {%- else %}
+  ! Warning: No description defined for interface {{ interface.name }}
+  {%- endif -%}
 
-{% for intf in interfaces | sort(attribute='name') %}
-interface {{ intf.name }}
-{% if intf.description and intf.description != 'Uplink to PEDC-A-DIST-SW01' %}
- description {{ intf.description }}
-{% endif %}
-{% if intf.ip_addresses %}
- ip address {{ intf.ip_addresses[0].address.split('/') [0] }} {{ intf.ip_addresses[0].address.split('/') [1] | int | cidr_to_netmask }}
-{% endif %}
-{% if intf.mode == 'ACCESS' %}
- switchport mode access
-  {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
-    {% if intf.untagged_vlan.vid == 1 %}
- switchport access vlan 1000
+  {# IP Address: Validate IP and prefix, convert to netmask #}
+  {%- if interface.ip_addresses is defined and interface.ip_addresses | length > 0 and interface.ip_addresses[0].address is defined %}
+  {% set ip_parts = interface.ip_addresses[0].address.split('/') %}
+  {% if ip_parts | length == 2 %}
+    {% set ip = ip_parts[0] %}
+    {% set prefix = ip_parts[1] | int %}
+    {% if prefix >= 0 and prefix <= 32 %}
+  ip address {{ ip }} {{ prefix | cidr_to_netmask }}
     {% else %}
- switchport access vlan {{ intf.untagged_vlan.vid }}
+  ! Warning: Invalid prefix {{ ip_parts[1] }} for IP address on {{ interface.name }}
     {% endif %}
-  {% endif %}
-  {% if intf._custom_field_data.get('cf_voice_vlan') %}
-    {% if intf._custom_field_data.get('cf_voice_vlan') == '1' %}
- switchport voice vlan 1000
-    {% else %}
- switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
-    {% endif %}
-  {% endif %}
-  {% if intf._custom_field_data.get('storm_control_level') %}
- storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
   {% else %}
- storm-control broadcast level bps 40m
+  ! Warning: Malformed IP address format for {{ interface.name }}
   {% endif %}
-  {% if intf._custom_field_data.get('portfast') %}
- spanning-tree portfast
-  {% endif %}
-  {% if intf._custom_field_data.get('bpduguard') %}
- spanning-tree bpduguard enable
-  {% endif %}
-  {% if intf._custom_field_data.get('dhcp_snooping_limit') %}
- ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
-  {% endif %}
-  {% if intf._custom_field_data.get('dhcp_snooping_trust') %}
- ip dhcp snooping trust
-  {% endif %}
-{% elif intf.tagged_vlans or intf.lag %}
-  {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
-    {% if intf.untagged_vlan.vid == 1 %}
- switchport trunk native vlan 1000
+  {%- endif -%}
+
+  {# VRF: Only include if defined and non-empty #}
+  {%- if interface.vrf is defined and interface.vrf and interface.vrf.name is defined and interface.vrf.name | string | length > 0 %}
+  vrf forwarding {{ interface.vrf.name }}
+  {%- else %}
+  ! Info: No VRF defined for interface {{ interface.name }}
+  {%- endif -%}
+
+  {# VLAN Configuration: Use mode, tagged/untagged VLANs, and defaults #}
+  {%- set defaults = host.config_context.access_switch_defaults.interface_defaults | default({}) %}
+  {% if interface.mode is defined and interface.mode %}
+    {# Access mode for non-port-channel interfaces #}
+    {%- if interface.mode == 'ACCESS' and (interface.untagged_vlan is defined or defaults.access_vlan is defined) and not interface.name.startswith('Port-channel') -%}
+  switchport access vlan {{ interface.untagged_vlan.vid | default(defaults.access_vlan) | int }}
+switchport mode access
+    {% if not (interface.untagged_vlan is defined and interface.untagged_vlan.vid is defined) and not defaults.access_vlan %}
+! Warning: No access VLAN defined for {{ interface.name }}, using default
+    {% endif %}
+    {# Trunk mode for tagged VLANs or port-channel #}
+    {% elif interface.mode in ['TAGGED', 'TAGGED_ALL'] or interface.name.startswith('Port-channel') %}
+      {% if interface.untagged_vlan is defined and interface.untagged_vlan and interface.untagged_vlan.vid is defined and interface.untagged_vlan.vid | int >= 1 and interface.untagged_vlan.vid | int <= 4094 %}
+switchport trunk native vlan {{ interface.untagged_vlan.vid }}
+      {% else %}
+! Warning: No native VLAN defined for trunk on {{ interface.name }}
+      {% endif %}
+      {% set vlan_list = interface.tagged_vlans | default([]) | selectattr('vid', 'defined') | map(attribute='vid') | map('int') | select('ge', 1) | select('le', 4094) | join(',') %}
+      {% if vlan_list | length > 0 %}
+switchport trunk allowed vlan {{ vlan_list }}
+      {% else %}
+  ! Warning: No tagged VLANs defined for trunk on {{ interface.name }}
+      {% endif %}
+switchport mode trunk
+switchport nonegotiate
     {% else %}
- switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+  ! Warning: Invalid mode {{ interface.mode }} for {{ interface.name }}
     {% endif %}
-  {% endif %}
-  {% if intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
-    {% set filtered_vlans = intf.tagged_vlans | rejectattr('vid', 'equalto', 1) | list %}
-    {% if filtered_vlans | length > 0 %}
- switchport trunk allowed vlan {{ filtered_vlans | map(attribute='vid') | sort | join(',') }}
+  {%- else %}
+  ! Warning: No mode defined for interface {{ interface.name }}
+  {%- endif -%}
+
+  {# Custom Fields: Portfast, BPDU Guard, Voice VLAN, etc. for non-port-channel #}
+  {%- set custom = interface._custom_field_data | default({}) %}
+  {%- if not interface.name.startswith('Port-channel') %}
+    {% if custom.portfast is defined and custom.portfast | bool and (defaults.spanning_tree_portfast is defined and defaults.spanning_tree_portfast | bool) %}
+spanning-tree portfast
+    {% else %}
+  ! Info: Portfast not enabled or not defined for {{ interface.name }}
     {% endif %}
-  {% endif %}
- switchport mode trunk
- switchport nonegotiate
- {{ render_storm_control(intf) }}
-  {% if intf.lag and intf.lag.name %}
- channel-group {{ intf.lag.name | replace('Port-channel', '') }} mode active
-  {% endif %}
-  {% if intf._custom_field_data.get('dhcp_snooping_trust') %}
- ip dhcp snooping trust
-  {% endif %}
-{% endif %}
-{% if intf.enabled %}
- no shutdown
-{% else %}
- shutdown
-{% endif %}
+    {% if custom.bpduguard is defined and custom.bpduguard | bool and (defaults.bpduguard is defined and defaults.bpduguard | bool) %}
+spanning-tree bpduguard enable
+    {% else %}
+  ! Info: BPDU guard not enabled or not defined for {{ interface.name }}
+    {% endif %}
+    {% if custom.cf_voice_vlan is defined and custom.cf_voice_vlan | int >= 1 and custom.cf_voice_vlan | int <= 4094 and (defaults.voice_vlan is defined and defaults.voice_vlan | int == custom.cf_voice_vlan | int) %}
+switchport voice vlan {{ custom.cf_voice_vlan }}
+    {% else %}
+  ! Info: Voice VLAN not defined or invalid for {{ interface.name }}
+    {% endif %}
+  {%- endif -%}
+
+  {# Storm Control: Handle level and units, adjust for port-channel #}
+  {%- if custom.storm_control_level is defined and custom.storm_control_level | string | length > 0 %}
+    {% set level = custom.storm_control_level | string %}
+    {% set unit = 'bps' if level.endswith('m') or level.endswith('k') else '' %}
+    {% set clean_level = level | replace('m', '') | replace('k', '') %}
+storm-control broadcast level bps {{ unit }} {{ clean_level }}
+  {%- else %}
+  ! Warning: No storm control level defined for {{ interface.name }}
+  {%- endif %}
+  {%- if custom.storm_control_action is defined and custom.storm_control_action %}
+    {% set action = custom.storm_control_action if custom.storm_control_action is string else (custom.storm_control_action | first if custom.storm_control_action | length > 0 else none) %}
+    {% if action and action != 'drop' %}
+storm-control action {{ action }}
+    {% else %}
+  ! Info: Storm control action set to drop or not defined for {{ interface.name }}
+    {% endif %}
+  {%- else %}
+  ! Warning: No storm control action defined for {{ interface.name }}
+  {%- endif -%}
+
+  {# Port-Channel: Handle LAG membership #}
+  {%- if interface.lag is defined and interface.lag and interface.lag.name is defined and not interface.name.startswith('Port-channel') %}
+  channel-group {{ interface.lag.name | replace('Port-channel', '') | int }} mode active
+  {%- else %}
+  ! Info: No LAG membership defined for {{ interface.name }}
+  {%- endif -%}
+
+  {# DHCP Snooping: Trust and limit rate #}
+  {%- if custom.dhcp_snooping_trust is defined and custom.dhcp_snooping_trust | bool %}
+ip dhcp snooping trust
+  {%- else %}
+  ! Info: DHCP snooping trust not enabled for {{ interface.name }}
+  {%- endif %}
+  {%- if custom.dhcp_snooping_limit is defined and custom.dhcp_snooping_limit | int > 0 %}
+ip dhcp snooping limit rate {{ custom.dhcp_snooping_limit }}
+  {%- else %}
+  ! Info: DHCP snooping limit rate not defined for {{ interface.name }}
+  {%- endif -%}
+
+  {# Interface State: Default to shutdown if enabled is not explicitly true #}
+  {%- if interface.enabled is defined and interface.enabled | bool %}
+  no shutdown
+  {%- else %}
+  shutdown
+  ! Info: Interface {{ interface.name }} is disabled, applying shutdown
+  {%- endif %}
 !
-
+{%- else %}
+! Warning: Skipped interface due to missing name
+{%- endif %}
 {% endfor %}
