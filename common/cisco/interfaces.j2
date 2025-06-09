@@ -9,10 +9,10 @@ interface {{ intf.name }}
   {% if uplink_interfaces | length > 0 %}
   description UPLINK to {{ uplink_interfaces[0].description | default('') | replace('Uplink to ', '') }}({{ uplink_interfaces | map(attribute='name') | join(', ') }})
   {% else %}
-  ! Warning: No uplink interfaces found for Port-channel {{ intf.name }}
+ description No uplink interfaces found for Port-channel {{ intf.name }}
   {% endif %}
  {% else %}
- ! Warning: No description defined for interface {{ intf.name }}
+ description No description defined for interface {{ intf.name }}
  {% endif %}
 
  {% if intf.ip_addresses is defined and intf.ip_addresses | length > 0 and intf.ip_addresses[0].address is defined %}
@@ -66,7 +66,7 @@ interface {{ intf.name }}
  switchport mode trunk
  switchport nonegotiate
   {% else %}
-  ! Warning: Invalid mode {{ intf.mode }} for {{ intf.name }}
+  ! Warning: Invalid mode {{ intf.name }}
   {% endif %}
  {% else %}
  ! Warning: No mode defined for interface {{ intf.name }}
