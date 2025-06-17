@@ -14,7 +14,7 @@
 {% endif %}
 !
 {% if host.config_context is defined and host.config_context.dns is defined %}
-  {% include 'common/cisco/dns.j2' %}
+{% include 'common/cisco/dns.j2' %}
 {% else %}
 ! DNS not defined in config_context.dns
 {% endif %}
@@ -26,7 +26,7 @@
 {% endif %}
 !
 {% if host.interfaces is defined and host.interfaces | length > 0 %}
-  {% include 'common/cisco/interfaces.j2' %}
+{% include 'common/cisco/interfaces.j2' %}
 {% else %}
 ! Interfaces not defined in host.interfaces
 {% endif %}
@@ -56,8 +56,8 @@
 {% else %}
 ! IP settings not fully defined (need site_pedc and/or syslog)
 {% endif %}
-!
-{% if host.config_context is defined and host.config_context.ntp is defined %}
+
+{%- if host.config_context is defined and host.config_context.ntp is defined -%}
   {% include 'common/cisco/ntp.j2' %}
 {% else %}
 ! NTP not defined in config_context.ntp
