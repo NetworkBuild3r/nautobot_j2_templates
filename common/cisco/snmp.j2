@@ -23,7 +23,7 @@ ip access-list standard SNMP_ACCESS_ACL
 {% set rack_name = host.rack.name | default('') if host.rack else '' %}
 {% set location_parts = [loc, rack_group, ('Rack ' ~ rack_name) if rack_name else ''] | select('ne', '') | list %}
 {% for comm in host.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {% raw %}{{ secrets_groups | selectattr('name', 'equalto', '{{ comm.secret_group }}') | first | get_secret_by_secret_group_name('community') | default('<SNMP_COMMUNITY>') }}{% endraw %} {{ comm.permission }} SNMP_ACCESS_ACL
+snmp-server community {% raw %}{{ "{% endraw %}{{ comm.secret_group }}{% raw %}" | get_secret_by_secret_group_name("key") }}{% endraw %} {{ comm.permission }} SNMP_ACCESS_ACL
 {% endfor %}
 
 snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
@@ -35,5 +35,9 @@ snmp-server enable traps {{ trap }}
 {% endfor %}
 
 {% for entry in host.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ entry.ip }} {% raw %}{{ secrets_groups | selectattr('name', 'equalto', '{{ entry.secret_group }}') | first | get_secret_by_secret_group_name('community') | default('<SNMP_COMMUNITY>') }}{% endraw %}
+{% if entry.version == "2c" %}
+snmp-server host {{ entry.ip }} version {{ entry.version }} {% raw %}{{ "{% endraw %}{{ entry.secret_group }}{% raw %}" | get_secret_by_secret_group_name("key") }}{% endraw %} 
+{% else %}
+snmp-server host {{ entry.ip }} {% raw %}{{ "{% endraw %}{{ entry.secret_group }}{% raw %}" | get_secret_by_secret_group_name("key") }}{% endraw %} 
+  {% endif %}
 {% endfor %}

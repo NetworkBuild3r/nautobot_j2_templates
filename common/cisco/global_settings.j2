@@ -3,11 +3,30 @@ service timestamps debug datetime msec localtime show-timezone
 service timestamps log datetime msec localtime show-timezone
 service password-encryption
 service call-home
+platform punt-keepalive disable-kernel-core
+!
 hostname {{ obj.name }}
+!
+logging buffered 16384 debugging
+clock timezone CST -6 0
+clock summer-time CDT recurring
+
 {% raw %}
-enable secret {{ "enable secret" | get_secret_by_secret_group_name("secret") }}
+enable algorithm-type scrypt secret {{ "2021_cisco_credentials" | get_secret_by_secret_group_name("secret") }}
 {% endraw %}
+
+{% raw %}
+username {{ "2021_cisco_credentials" | get_secret_by_secret_group_name("username") }} privilege 15 algorithm-type scrypt secret {{ "2021_cisco_credentials" | get_secret_by_secret_group_name("password") }}
+{% endraw %}
+
+udld aggressive
+crypto key generate rsa general-keys modulus 2048
+
 logging console warnings
 vtp mode off
 lldp run
 !
+platform punt-keepalive disable-kernel-core
+logging buffered 16384 debugging
+clock timezone CST -6 0
+clock summer-time CDT recurring

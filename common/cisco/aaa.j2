@@ -1,4 +1,4 @@
-{% if host.config_context.aaa.new_model | default(true) %}
+{%- if host.config_context.aaa.new_model | default(true) -%}
 aaa new-model
 {% endif %}
 

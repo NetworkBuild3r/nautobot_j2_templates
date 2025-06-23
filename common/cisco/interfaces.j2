@@ -1,27 +1,27 @@
-{%- macro render_storm_control(intf) %}
+{% macro render_storm_control(intf) %}
 {% if intf._custom_field_data.get('storm_control_level') %}
- storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}
+ storm-control broadcast level bps {{ intf._custom_field_data.get('storm_control_level') }}.00
 {% else %}
- storm-control broadcast level bps 40
+ storm-control broadcast level bps 40.00
 {% endif %}
-{%- if intf._custom_field_data.get('storm_control_action') %}
-{%- set action_val = intf._custom_field_data.get('storm_control_action') %}
-{%- if action_val is string %}
-{%- set action = action_val %}
-{%- elif action_val is iterable and action_val | length > 0 %}
-{%- set action = action_val[0] %}
-{%- else %}
-{%- set action = none %}
-{%- endif %}
+{% if intf._custom_field_data.get('storm_control_action') %}
+{% set action_val = intf._custom_field_data.get('storm_control_action') %}
+{% if action_val is string %}
+{% set action = action_val %}
+{% elif action_val is iterable and action_val | length > 0 %}
+{% set action = action_val[0] %}
+{% else %}
+{% set action = none %}
+{% endif %}
 {% if action and action != 'drop' %}
  storm-control action {{ action }}
 {%- endif %}
 {% else %}
  storm-control action shutdown
-{%- endif %}
-{%- endmacro %}
+{% endif %}
+{% endmacro %}
 
-{% for intf in interfaces | sort(attribute='name') %}
+{%- for intf in interfaces | sort(attribute='name') %}
 interface {{ intf.name }}
 {% if intf.description %}
  description {{ intf.description }}

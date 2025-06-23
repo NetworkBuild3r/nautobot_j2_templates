@@ -1,4 +1,4 @@
-{%- set stp = host.config_context.get('stp', {}) -%}
+{% set stp = host.config_context.get('stp', {}) %}
 !
 {% if stp.mode %}
 spanning-tree mode {{ stp.mode }}
