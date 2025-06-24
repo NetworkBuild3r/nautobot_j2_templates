@@ -1,9 +1,25 @@
-{% for dns in host.config_context.dns %}
-{{ dns }}
+{%- if host.config_context is defined and host.config_context.dns is defined -%}
+{%- if host.config_context.dns.name_servers is defined -%}
+{% for server in host.config_context.dns.name_servers %}
+ip name-server {{ server }}
 {% endfor %}
-ip domain lookup source-interface {{ host.config_context.syslog.source_interface }}
+{%- endif %}
+{%- if host.config_context.dns.domain_list is defined -%}
+{% for domain in host.config_context.dns.domain_list %}
+ip domain list {{ domain }}
+{% endfor %}
+{%- endif %}
+{% if host.config_context.dns.domain_name is defined %}
+ip domain name {{ host.config_context.dns.domain_name }}
+{% endif %}
+{% if host.config_context.dns.source_interface is defined %}
+ip domain lookup source-interface {{ host.config_context.dns.source_interface }}
+{% endif %}
+{% else %}
+! No DNS entries to configure
+{% endif %}
+!
 no ip dhcp snooping information option
 ip dhcp snooping
 login on-success log
 ipv6 unicast-routing
-!
