@@ -1,140 +1,88 @@
-{%- macro render_storm_control(intf, is_uplink=False) %}
-{% if intf._custom_field_data.get('storm_control_level') %}
- storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
-{% elif is_uplink %}
- storm-control broadcast level bps 20m
-{% else %}
- storm-control broadcast level 40.00
+{% for interface in interfaces %}
+interface {{ interface.name }}
+{% if interface.description %}
+ description {{ interface.description }}
 {% endif %}
-{%- if intf._custom_field_data.get('storm_control_action') %}
-{%- set action_val = intf._custom_field_data.get('storm_control_action') %}
-{%- if action_val is string %}
-{%- set action = action_val %}
-{%- elif action_val is iterable and action_val | length > 0 %}
-{%- set action = action_val[0] %}
-{%- else %}
-{%- set action = none %}
-{%- endif %}
-{% if action and action != 'drop' %}
- storm-control action {{ action }}
-{%- endif %}
-{% else %}
- storm-control action shutdown
-{%- endif %}
-{%- endmacro %}
-
-{# Validation logic for Port-channel and member interfaces #}
-{% set port_channel_mismatches = [] %}
-{% set port_channels = interfaces | selectattr('name', 'match', '^Port-channel') | list %}
-{% for pc in port_channels %}
-  {% set pc_native_vlan = pc.untagged_vlan.vid if pc.untagged_vlan is defined and pc.untagged_vlan.vid is defined else 1000 %}
-  {% set pc_allowed_vlans = (pc.tagged_vlans | map(attribute='vid') | sort | join(',') if pc.tagged_vlans is defined and pc.tagged_vlans | length > 0 else '') %}
-  {% set pc_storm_level = pc._custom_field_data.get('storm_control_level', 'bps 20m') if pc._custom_field_data is defined else 'bps 20m' %}
-  {% set pc_storm_action = pc._custom_field_data.get('storm_control_action', ['shutdown'])[0] if pc._custom_field_data is defined and pc._custom_field_data.get('storm_control_action') else 'shutdown' %}
-  {% set pc_dhcp_trust = pc._custom_field_data.get('dhcp_snooping_trust', false) if pc._custom_field_data is defined else false %}
-  
-  {% set members = interfaces | selectattr('lag', 'defined') | selectattr('lag.name', 'equalto', pc.name) | list %}
-  {% for member in members %}
-    {% set member_native_vlan = member.untagged_vlan.vid if member.untagged_vlan is defined and member.untagged_vlan.vid is defined else 1000 %}
-    {% set member_allowed_vlans = (member.tagged_vlans | map(attribute='vid') | sort | join(',') if member.tagged_vlans is defined and member.tagged_vlans | length > 0 else '') %}
-    {% set member_storm_level = member._custom_field_data.get('storm_control_level', 'bps 20m') if member._custom_field_data is defined else 'bps 20m' %}
-    {% set member_storm_action = member._custom_field_data.get('storm_control_action', ['shutdown'])[0] if member._custom_field_data is defined and member._custom_field_data.get('storm_control_action') else 'shutdown' %}
-    {% set member_dhcp_trust = member._custom_field_data.get('dhcp_snooping_trust', false) if member._custom_field_data is defined else false %}
-    
-    {% if pc_native_vlan != member_native_vlan %}
-      {% set _ = port_channel_mismatches.append("Interface " ~ member.name ~ " mismatches " ~ pc.name ~ " on native_vlan: expected " ~ pc_native_vlan ~ ", got " ~ member_native_vlan) %}
-    {% endif %}
-    {% if pc_allowed_vlans != member_allowed_vlans %}
-      {% set _ = port_channel_mismatches.append("Interface " ~ member.name ~ " mismatches " ~ pc.name ~ " on allowed_vlans: expected " ~ pc_allowed_vlans ~ ", got " ~ member_allowed_vlans) %}
-    {% endif %}
-    {% if pc_storm_level != member_storm_level %}
-      {% set _ = port_channel_mismatches.append("Interface " ~ member.name ~ " mismatches " ~ pc.name ~ " on storm_control_level: expected " ~ pc_storm_level ~ ", got " ~ member_storm_level) %}
-    {% endif %}
-    {% if pc_storm_action != member_storm_action %}
-      {% set _ = port_channel_mismatches.append("Interface " ~ member.name ~ " mismatches " ~ pc.name ~ " on storm_control_action: expected " ~ pc_storm_action ~ ", got " ~ member_storm_action) %}
-    {% endif %}
-    {% if pc_dhcp_trust != member_dhcp_trust %}
-      {% set _ = port_channel_mismatches.append("Interface " ~ member.name ~ " mismatches " ~ pc.name ~ " on dhcp_snooping_trust: expected " ~ pc_dhcp_trust ~ ", got " ~ member_dhcp_trust) %}
-    {% endif %}
-  {% endfor %}
-{% endfor %}
-
-{# Render validation warnings if any #}
-{% if port_channel_mismatches %}
-! WARNING: Port-channel configuration mismatches detected:
-{% for mismatch in port_channel_mismatches %}
-! {{ mismatch }}
-{% endfor %}
-!
-{% endif %}
-
-{% for intf in interfaces | sort(attribute='name') %}
-interface {{ intf.name }}
-{% if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
- description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
-{% elif intf.description %}
- description {{ intf.description }}
-{% endif %}
-{% if intf.ip_addresses %}
- ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
-{% endif %}
-{% if intf.mode == 'ACCESS' %}
- switchport mode access
-{% set vlan_type = intf._custom_field_data.get('vlan_type') if intf._custom_field_data is defined else none %}
-{% if vlan_type in ['data', 'video', 'security'] and intf._custom_field_data.get(vlan_type + '_vlan') %}
- switchport access vlan {{ intf._custom_field_data.get(vlan_type + '_vlan') }}
-{% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
- switchport access vlan {{ intf.untagged_vlan.vid }}
-{% endif %}
-{% if intf._custom_field_data.get('cf_voice_vlan') %}
- switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
-{% endif %}
-{{ render_storm_control(intf) }}
-{% if intf._custom_field_data.get('portfast') %}
- spanning-tree portfast
-{% endif %}
-{% if intf._custom_field_data.get('bpduguard') %}
- spanning-tree bpduguard enable
-{% endif %}
-{% if intf._custom_field_data.get('dhcp_snooping_limit') %}
- ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
-{% else %}
- ip dhcp snooping limit rate 30
-{% endif %}
-{% if intf._custom_field_data.get('dhcp_snooping_trust') %}
- ip dhcp snooping trust
-{% endif %}
-{% elif intf.mode in ['TAGGED', 'TAGGED_ALL'] or intf.name.startswith('Port-channel') %}
- switchport mode trunk
-{% if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
- switchport trunk native vlan 1000
-{%- set vlan_list = [] %}
-{%- if intf._custom_field_data.get('data_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('data_vlan')) %}{% endif %}
-{%- if intf._custom_field_data.get('voice_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('voice_vlan')) %}{% endif %}
-{%- if intf._custom_field_data.get('video_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('video_vlan')) %}{% endif %}
-{%- if intf._custom_field_data.get('security_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('security_vlan')) %}{% endif %}
-{%- if vlan_list %}
- switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
-{%- endif %}
-{% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
- switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-{% if intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
- switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
-{% endif %}
-{% endif %}
- switchport nonegotiate
-{{ render_storm_control(intf, is_uplink=(intf.name.startswith('Port-channel') or (intf.lag and intf.lag.name))) }}
-{% if intf.lag and intf.lag.name %}
- channel-group {{ intf.lag.name | replace('Port-channel', '') }} mode active
-{% endif %}
-{% if intf._custom_field_data.get('dhcp_snooping_trust') %}
- ip dhcp snooping trust
-{% endif %}
-{% endif %}
-{% if intf.enabled %}
- no shutdown
-{% else %}
+{% if interface.enabled is defined and not interface.enabled %}
  shutdown
 {% endif %}
-!
+
+{# Port Channel Configuration #}
+{% if interface.name.startswith('Port-channel') %}
+ {% if interface.mode in ['TAGGED', 'TAGGED_ALL'] %}
+  switchport mode trunk
+  {% if interface.tagged_vlans %}
+  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
+  {% endif %}
+  {% if interface.untagged_vlan %}
+  switchport trunk native vlan {{ interface.untagged_vlan.vid }}
+  {% endif %}
+ {% endif %}
+
+ {# Validate member interfaces #}
+ {% set pc_name = interface.name %}
+ {% set pc_tagged = interface.tagged_vlans | default([]) | map(attribute='vid') | list %}
+ {% set pc_untagged = interface.untagged_vlan.vid if interface.untagged_vlan else none %}
+ {% for member in interfaces if member.lag and member.lag.name == pc_name %}
+  {% set member_tagged = member.tagged_vlans | default([]) | map(attribute='vid') | list %}
+  {% set member_untagged = member.untagged_vlan.vid if member.untagged_vlan else none %}
+  {% if member_tagged != pc_tagged or member_untagged != pc_untagged %}
+   ! Warning: {{ member.name }} VLANs (tagged: {{ member_tagged }}, untagged: {{ member_untagged }}) differ from {{ pc_name }} (tagged: {{ pc_tagged }}, untagged: {{ pc_untagged }})
+  {% endif %}
+ {% endfor %}
+
+{# VLAN and Loopback Interfaces #}
+{% elif interface.name.startswith('Vlan') or interface.name.startswith('Loopback') %}
+ {% if interface.ip_addresses %}
+  ip address {{ interface.ip_addresses[0].address }}
+ {% endif %}
+
+{# Physical Interface with LAG #}
+{% elif interface.lag %}
+ channel-group {{ interface.lag.name | replace('Port-channel', '') }} mode active
+
+{# Physical Interface without LAG #}
+{% elif interface.mode is defined %}
+ {% if interface.mode == 'ACCESS' %}
+  switchport mode access
+  {% if interface.untagged_vlan %}
+  switchport access vlan {{ interface.untagged_vlan.vid }}
+  {% endif %}
+  {% if interface._custom_field_data.cf_voice_vlan %}
+  switchport voice vlan {{ interface._custom_field_data.cf_voice_vlan }}
+  {% endif %}
+ {% elif interface.mode in ['TAGGED', 'TAGGED_ALL'] %}
+  switchport mode trunk
+  {% if interface.tagged_vlans %}
+  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
+  {% endif %}
+  {% if interface.untagged_vlan %}
+  switchport trunk native vlan {{ interface.untagged_vlan.vid }}
+  {% endif %}
+ {% endif %}
+{% endif %}
+
+{# Custom Field Configurations #}
+{% if interface._custom_field_data is defined %}
+ {% if interface._custom_field_data.portfast %}
+ spanning-tree portfast
+ {% endif %}
+ {% if interface._custom_field_data.bpduguard %}
+ spanning-tree bpduguard enable
+ {% endif %}
+ {% if interface._custom_field_data.dhcp_snooping_trust %}
+ ip dhcp snooping trust
+ {% endif %}
+ {% if interface._custom_field_data.dhcp_snooping_limit %}
+ ip dhcp snooping limit rate {{ interface._custom_field_data.dhcp_snooping_limit }}
+ {% endif %}
+ {% if interface._custom_field_data.storm_control_level %}
+ storm-control broadcast level {{ interface._custom_field_data.storm_control_level }}
+ {% endif %}
+ {% if interface._custom_field_data.storm_control_action and 'shutdown' in interface._custom_field_data.storm_control_action %}
+ storm-control action shutdown
+ {% endif %}
+{% endif %}
+
+! End of interface {{ interface.name }}
 {% endfor %}
