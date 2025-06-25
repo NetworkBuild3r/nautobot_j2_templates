@@ -9,7 +9,7 @@ aaa authentication dot1x default {{ host.config_context.aaa.authentication.dot1x
 {%   endif %}
 {%   if host.config_context.aaa.authentication.login is defined %}
 {%     if host.config_context.aaa.authentication.login.console is defined %}
-aaa authentication login console {{ host.config_context.aaa.authentication.login.console }}
+aaa authentication login console default {{ host.config_context.aaa.authentication.login.console }}
 {%     endif %}
 {%     if host.config_context.aaa.authentication.login.default is defined %}
 aaa authentication login default {{ host.config_context.aaa.authentication.login.default }}
@@ -23,13 +23,13 @@ aaa authentication enable default {{ host.config_context.aaa.authentication.enab
 {# Authorization #}
 {% if host.config_context.aaa.authorization is defined %}
 {%   if host.config_context.aaa.authorization.exec is defined %}
-aaa authorization exec {{ host.config_context.aaa.authorization.exec }}
+aaa authorization exec default {{ host.config_context.aaa.authorization.exec }}
 {%   endif %}
 {%   if host.config_context.aaa.authorization.network is defined %}
-aaa authorization network {{ host.config_context.aaa.authorization.network }}
+aaa authorization network default {{ host.config_context.aaa.authorization.network }}
 {%   endif %}
 {%   if host.config_context.aaa.authorization.auth_proxy is defined %}
-aaa authorization auth_proxy {{ host.config_context.aaa.authorization.auth_proxy }}
+aaa authorization auth-proxy default {{ host.config_context.aaa.authorization.auth_proxy }}
 {%   endif %}
 {% endif %}
 
@@ -61,11 +61,10 @@ aaa group server tacacs+ default
 
 {# TACACS Servers #}
 {% if host.config_context.aaa.tacacs_servers is defined %}
-{%   for server in host.config_context.aaa.tacacs_servers %}
-tacacs server {{ server.name }}
- address ipv4 {{ server.ip_address }}
- key {% raw %}{{ secrets_group["name"] | get_secret_by_secret_group_name(server.name | lower | replace("-", "_") ~ "_key") | default("tacacs_key") }}{% endraw %}
-{%   endfor %}
+{% for server in host.config_context.aaa.tacacs_servers %}
+tacacs server {{ server.name }} address ipv4 {{ server.ip_address }} key {% raw %}{{ "{% endraw %}{{server.secret_group}}{% raw %}" | get_secret_by_secret_group_name("secret") }}{% endraw %}
+
+{% endfor %}
 {% endif %}
 
 {# Misc #}

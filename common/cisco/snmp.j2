@@ -29,10 +29,13 @@ snmp-server community {% raw %}{{ "{% endraw %}{{ comm.secret_group }}{% raw %}"
 snmp-server trap-source {{ host.config_context.cisco_snmp_ios.snmp.trap_source }}
 snmp-server contact "{{ host.config_context.cisco_snmp_ios.snmp.contact }}"
 snmp-server location {{ location_parts | join(' ') | default('Unknown') }}
-
-{% for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}
+{# Only render SNMP traps if defined and non-empty #}
+{% if host.config_context['cisco_snmp_ios']['snmp'].get('enable_traps') %}
+  {# Enabled SNMP Traps #}
+  {% for trap in host.config_context['cisco_snmp_ios']['snmp']['enable_traps'] %}
 snmp-server enable traps {{ trap }}
-{% endfor %}
+  {% endfor %}
+{% endif %}
 
 {% for entry in host.config_context.cisco_snmp_ios.snmp.hosts %}
 {% if entry.version == "2c" %}

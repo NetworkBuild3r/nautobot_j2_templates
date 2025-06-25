@@ -42,6 +42,7 @@
 {%- for vlan in vlan_list | sort(attribute='vid') -%}
 vlan {{ vlan.vid }}
   name {{ vlan.name }}
+  description {{ vlan.name }}
 {% endfor %}
 
 {# Render dhcp snooping only for valid VLANs #}
