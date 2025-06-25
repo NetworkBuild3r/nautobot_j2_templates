@@ -1,11 +1,9 @@
-{%- macro render_storm_control(intf, is_uplink=False) %}
-{% if intf._custom_field_data.get('storm_control_level') %}
- storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
-{% elif is_uplink %}
- storm-control broadcast level bps 20m
-{% else %}
- storm-control broadcast level 40.00
+{% for interface in interfaces %}
+interface {{ interface.name }}
+{% if interface.description %}
+ description {{ interface.description }}
 {% endif %}
+<<<<<<< HEAD
 {%- if intf._custom_field_data.get('storm_control_action') %}
 {%- set action_val = intf._custom_field_data.get('storm_control_action') %}
 {%- if action_val is string %}
@@ -89,7 +87,88 @@ interface {{ intf.name }}
 {% if intf.enabled %}
  no shutdown
 {% else %}
+=======
+{% if interface.enabled is defined and not interface.enabled %}
+>>>>>>> 4e6fc5bdb9632eebe1b730ea21e553939e6e47c1
  shutdown
 {% endif %}
-!
+
+{# Port Channel Configuration #}
+{% if interface.name.startswith('Port-channel') %}
+ {% if interface.mode in ['TAGGED', 'TAGGED_ALL'] %}
+  switchport mode trunk
+  {% if interface.tagged_vlans %}
+  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
+  {% endif %}
+  {% if interface.untagged_vlan %}
+  switchport trunk native vlan {{ interface.untagged_vlan.vid }}
+  {% endif %}
+ {% endif %}
+
+ {# Validate member interfaces #}
+ {% set pc_name = interface.name %}
+ {% set pc_tagged = interface.tagged_vlans | default([]) | map(attribute='vid') | list %}
+ {% set pc_untagged = interface.untagged_vlan.vid if interface.untagged_vlan else none %}
+ {% for member in interfaces if member.lag and member.lag.name == pc_name %}
+  {% set member_tagged = member.tagged_vlans | default([]) | map(attribute='vid') | list %}
+  {% set member_untagged = member.untagged_vlan.vid if member.untagged_vlan else none %}
+  {% if member_tagged != pc_tagged or member_untagged != pc_untagged %}
+   ! Warning: {{ member.name }} VLANs (tagged: {{ member_tagged }}, untagged: {{ member_untagged }}) differ from {{ pc_name }} (tagged: {{ pc_tagged }}, untagged: {{ pc_untagged }})
+  {% endif %}
+ {% endfor %}
+
+{# VLAN and Loopback Interfaces #}
+{% elif interface.name.startswith('Vlan') or interface.name.startswith('Loopback') %}
+ {% if interface.ip_addresses %}
+  ip address {{ interface.ip_addresses[0].address }}
+ {% endif %}
+
+{# Physical Interface with LAG #}
+{% elif interface.lag %}
+ channel-group {{ interface.lag.name | replace('Port-channel', '') }} mode active
+
+{# Physical Interface without LAG #}
+{% elif interface.mode is defined %}
+ {% if interface.mode == 'ACCESS' %}
+  switchport mode access
+  {% if interface.untagged_vlan %}
+  switchport access vlan {{ interface.untagged_vlan.vid }}
+  {% endif %}
+  {% if interface._custom_field_data.cf_voice_vlan %}
+  switchport voice vlan {{ interface._custom_field_data.cf_voice_vlan }}
+  {% endif %}
+ {% elif interface.mode in ['TAGGED', 'TAGGED_ALL'] %}
+  switchport mode trunk
+  {% if interface.tagged_vlans %}
+  switchport trunk allowed vlan {{ interface.tagged_vlans | map(attribute='vid') | join(',') }}
+  {% endif %}
+  {% if interface.untagged_vlan %}
+  switchport trunk native vlan {{ interface.untagged_vlan.vid }}
+  {% endif %}
+ {% endif %}
+{% endif %}
+
+{# Custom Field Configurations #}
+{% if interface._custom_field_data is defined %}
+ {% if interface._custom_field_data.portfast %}
+ spanning-tree portfast
+ {% endif %}
+ {% if interface._custom_field_data.bpduguard %}
+ spanning-tree bpduguard enable
+ {% endif %}
+ {% if interface._custom_field_data.dhcp_snooping_trust %}
+ ip dhcp snooping trust
+ {% endif %}
+ {% if interface._custom_field_data.dhcp_snooping_limit %}
+ ip dhcp snooping limit rate {{ interface._custom_field_data.dhcp_snooping_limit }}
+ {% endif %}
+ {% if interface._custom_field_data.storm_control_level %}
+ storm-control broadcast level {{ interface._custom_field_data.storm_control_level }}
+ {% endif %}
+ {% if interface._custom_field_data.storm_control_action and 'shutdown' in interface._custom_field_data.storm_control_action %}
+ storm-control action shutdown
+ {% endif %}
+{% endif %}
+
+! End of interface {{ interface.name }}
 {% endfor %}
