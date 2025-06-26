@@ -1,13 +1,13 @@
-! OSPF Configuration for {{ device.hostname|default('unknown device') }}
+! OSPF Configuration for {{ host.hostname|default('unknown device') }}
 !
 ! OSPF interface configurations (adding OSPF-specific settings to existing interfaces)
-{% if device.config_context.ospf and device.config_context.ospf.interfaces %}
-{% for intf in device.config_context.ospf.interfaces %}
+{% if host.config_context.ospf and host.config_context.ospf.interfaces %}
+{% for intf in host.config_context.ospf.interfaces %}
 {% if intf.ip_address %}
 interface {{ intf.name }}
 {% if intf.apply_helper|default(false) and intf.name != 'Vlan1000' %}
- {% if device.config_context.ospf_group.helper_addresses %}
- {% for helper in device.config_context.ospf_group.helper_addresses %}
+ {% if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
+ {% for helper in host.config_context.ospf_group.helper_addresses %}
  ip helper-address {{ helper }}
  {% endfor %}
  {% else %}
@@ -15,7 +15,7 @@ interface {{ intf.name }}
  {% endif %}
 {% endif %}
 {% if intf.md5_key %}
- ip ospf message-digest-key {{ intf.md5_key }} md5 7 {{ device.config_context.ospf_group.md5_secret|default('missing_md5_secret') }}
+ ip ospf message-digest-key {{ intf.md5_key }} md5 7 {% raw %}{{ "{% endraw %}{{ host.config_context.ospf_group.md5_secret }}{% raw %}" | get_secret_by_secret_group_name("key") }}{% endraw %}
 {% else %}
  ! missing md5_key for interface {{ intf.name }}
 {% endif %}
@@ -35,22 +35,22 @@ interface {{ intf.name }}
 {% endif %}
 !
 ! OSPF process configuration
-{% if device.config_context.ospf.loopback_ip and device.config_context.ospf.area %}
-router ospf {{ device.config_context.ospf_group.process_id|default(1) }}
- router-id {{ device.config_context.ospf.loopback_ip }}
-{% if device.config_context.ospf_group.global_settings.ignore_lsa_mospf %}
+{% if host.config_context.ospf and host.config_context.ospf.loopback_ip and host.config_context.ospf.area %}
+router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
+ router-id {{ host.config_context.ospf.loopback_ip }}
+{% if host.config_context.ospf_group and host.config_context.ospf_group.global_settings.ignore_lsa_mospf %}
  ignore lsa mospf
 {% endif %}
-{% if device.config_context.ospf_group.global_settings.log_adjacency_changes %}
- log-adjacency-changes {{ device.config_context.ospf_group.global_settings.log_adjacency_changes }}
+{% if host.config_context.ospf_group and host.config_context.ospf_group.global_settings.log_adjacency_changes %}
+ log-adjacency-changes {{ host.config_context.ospf_group.global_settings.log_adjacency_changes }}
 {% endif %}
- area {{ device.config_context.ospf.area }} authentication message-digest
-{% if device.config_context.ospf_group.area_type %}
- area {{ device.config_context.ospf.area }} {{ device.config_context.ospf_group.area_type }}{% if device.config_context.ospf_group.area_options %} {{ device.config_context.ospf_group.area_options|join(' ') }}{% endif %}
+ area {{ host.config_context.ospf.area }} authentication message-digest
+{% if host.config_context.ospf_group and host.config_context.ospf_group.area_type %}
+ area {{ host.config_context.ospf.area }} {{ host.config_context.ospf_group.area_type }}{% if host.config_context.ospf_group.area_options %} {{ host.config_context.ospf_group.area_options|join(' ') }}{% endif %}
 {% else %}
  ! missing area_type in ospf_group
 {% endif %}
-{% for intf in device.config_context.ospf.interfaces if intf.ip_address %}
+{% for intf in host.config_context.ospf.interfaces if intf.ip_address %}
 {% set ip_parts = intf.ip_address.split('/') %}
 {% set ip = ip_parts[0] %}
 {% set prefix = ip_parts[1]|int %}
@@ -59,7 +59,7 @@ router ospf {{ device.config_context.ospf_group.process_id|default(1) }}
  {% set mask = (2 ** (32 - prefix) - 1)|ip_wildcard %}
  {% set wildcard = mask %}
 {% endif %}
- network {{ ip }} {{ wildcard }} area {{ device.config_context.ospf.area }}
+ network {{ ip }} {{ wildcard }} area {{ host.config_context.ospf.area }}
 {% endfor %}
 {% else %}
  ! missing loopback_ip or area in config_context.ospf
