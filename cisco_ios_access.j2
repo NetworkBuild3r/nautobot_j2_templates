@@ -24,6 +24,8 @@
 {% else %}
 ! Spanning-tree not defined in config_context.stp
 {% endif %}
+#}
+{% include 'common/cisco/ospf.j2' %}
 
 {% if host.interfaces is defined and host.interfaces | length > 0 %}
 {% with interfaces = host.interfaces %}
@@ -32,7 +34,8 @@
 {% else %}
 ! No interfaces defined in host.interfaces
 {% endif %}
-!
+
+{#
 {% if host.config_context is defined and host.config_context.cisco_snmp_ios is defined %}
 {% include 'common/cisco/snmp.j2' %}
 {% else %}
@@ -65,9 +68,9 @@
 ! NTP not defined in config_context.ntp
 {% endif %} #}
 
-!
+
 {# {% if host.config_context is defined and host.config_context.ospf is defined and host.config_context.ospf.global is defined %} #}
-{% include 'common/cisco/ospf.j2' %}
+
 {# {% else %}
 ! OSPF not configured (ospf or ospf.global not defined in config_context)
 {% endif %}

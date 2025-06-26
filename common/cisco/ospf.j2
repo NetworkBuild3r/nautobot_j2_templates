@@ -1,44 +1,5 @@
-! OSPF Configuration for {{ host.hostname|default('unknown device') }}
+! OSPF process configuration for {{ host.hostname|default('unknown device') }}
 !
-! OSPF interface configurations (adding OSPF-specific settings to existing interfaces)
-{% if host.config_context.ospf and host.config_context.ospf.interfaces %}
-{% set device_interfaces = host.interfaces|map(attribute='name')|list %}
-{% for intf in host.config_context.ospf.interfaces %}
-{% if intf.ip_address %}
-{% if intf.name not in device_interfaces %}
- ! interface {{ intf.name }} not found in device interfaces
-{% endif %}
-interface {{ intf.name }}
-{% if intf.apply_helper|default(false) and intf.name != 'Vlan1000' %}
- {% if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
- {% for helper in host.config_context.ospf_group.helper_addresses %}
- ip helper-address {{ helper }}
- {% endfor %}
- {% else %}
- ! missing helper_addresses in ospf_group for {{ intf.name }}
- {% endif %}
-{% endif %}
-{% if intf.md5_key %}
- ip ospf message-digest-key {{ intf.md5_key }} md5 7 {% raw %}{{ "{% endraw %}{{ host.config_context.ospf_group.md5_secret }}{% raw %}" | get_secret_by_secret_group_name("key") }}{% endraw %}
-{% else %}
- ! missing md5_key for interface {{ intf.name }}
-{% endif %}
-{% if intf.network_type is defined %}
- ip ospf network {{ intf.network_type }}
-{% else %}
- ip ospf network {{ 'point-to-point' if intf.type in ['port-channel', 'physical', 'loopback'] else 'broadcast' }}
- ! missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.type in ['port-channel', 'physical', 'loopback'] else 'broadcast' }}
-{% endif %}
-!
-{% else %}
- ! missing ip_address for interface {{ intf.name }} in ospf.interfaces
-{% endif %}
-{% endfor %}
-{% else %}
- ! missing ospf.interfaces in config_context
-{% endif %}
-!
-! OSPF process configuration
 {% if host.config_context.ospf and host.config_context.ospf.loopback_ip and host.config_context.ospf.area %}
 router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
  router-id {{ host.config_context.ospf.loopback_ip }}
@@ -54,12 +15,20 @@ router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
 {% else %}
  ! missing area_type in ospf_group
 {% endif %}
-{% for intf in host.config_context.ospf.interfaces if intf.ip_address %}
-{% if intf.network and intf.wildcard %}
- network {{ intf.network }} {{ intf.wildcard }} area {{ host.config_context.ospf.area }}
-{% else %}
- ! missing network or wildcard for interface {{ intf.name }}
+{% set ospf_interfaces = host.config_context.ospf.interfaces|default([])|map(attribute='name')|list %}
+{% for intf in host.interfaces if intf.name in ospf_interfaces and intf.ip_addresses %}
+{% set ip_parts = intf.ip_addresses[0].address.split('/') %}
+{% set ip = ip_parts[0] %}
+{% set prefix = ip_parts[1]|int %}
+{% set wildcard = '0.0.0.0' %}
+{% if prefix < 32 %}
+ {% set mask = (2 ** (32 - prefix) - 1)|ip_wildcard %}
+ {% set wildcard = mask %}
 {% endif %}
+ network {{ ip }} {{ wildcard }} area {{ host.config_context.ospf.area }}
+{% endfor %}
+{% for ospf_intf in host.config_context.ospf.interfaces if ospf_intf.name not in host.interfaces|map(attribute='name')|list %}
+ ! interface {{ ospf_intf.name }} in OSPF config but not assigned to device, skipping network statement
 {% endfor %}
 {% else %}
  ! missing loopback_ip or area in config_context.ospf
