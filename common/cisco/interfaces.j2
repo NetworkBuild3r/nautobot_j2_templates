@@ -107,6 +107,7 @@ interface {{ intf.name }}
 {% if ospf_intf.network_type is defined %}
  ip ospf network {{ ospf_intf.network_type }}
 {% else %}
+
  ip ospf network {{ 'point-to-point' if intf.name.startswith('Port-channel') or intf.name.startswith('Loopback') else 'broadcast' }}
  ! missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.name.startswith('Port-channel') or intf.name.startswith('Loopback') else 'broadcast' }}
 {% endif %}
