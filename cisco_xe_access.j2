@@ -1,30 +1,30 @@
-{#!#}
-{#{% include 'common/cisco/global_settings.j2' %}#}
-{#!#}
-{#{% if host.config_context is defined and host.config_context.aaa is defined %}#}
-{#{% include 'common/cisco/aaa.j2' %}#}
-{#{% else %}#}
-{#! AAA configuration not defined in config_context.aaa#}
-{#{% endif %}#}
-{#!#}
-{#{% if host.config_context is defined and host.config_context.vlans is defined %}#}
-{#  {% include 'common/cisco/vlans.j2' %}#}
-{#{% else %}#}
-{#! VLAN definitions not defined in config_context.vlans#}
-{#{% endif %}#}
-{#!#}
-{#{% if host.config_context is defined and host.config_context.dns is defined %}#}
-{#{% include 'common/cisco/dns.j2' %}#}
-{#{% else %}#}
-{#! DNS not defined in config_context.dns#}
-{#{% endif %}#}
-{##}
-{#{% if host.config_context is defined and host.config_context.stp is defined %}#}
-{#{% include 'common/cisco/spanning_tree.j2' %}#}
-{#{% else %}#}
-{#! Spanning-tree not defined in config_context.stp#}
-{#{% endif %}#}
-{#!#}
+{# !
+{% include 'common/cisco/global_settings.j2' %}
+!
+{% if host.config_context is defined and host.config_context.aaa is defined %}
+{% include 'common/cisco/aaa.j2' %}
+{% else %}
+! AAA configuration not defined in config_context.aaa
+{% endif %}
+!
+{% if host.config_context is defined and host.config_context.vlans is defined %}
+  {% include 'common/cisco/vlans.j2' %}
+{% else %}
+! VLAN definitions not defined in config_context.vlans
+{% endif %}
+!
+{% if host.config_context is defined and host.config_context.dns is defined %}
+{% include 'common/cisco/dns.j2' %}
+{% else %}
+! DNS not defined in config_context.dns
+{% endif %}
+
+{% if host.config_context is defined and host.config_context.stp is defined %}
+{% include 'common/cisco/spanning_tree.j2' %}
+{% else %}
+! Spanning-tree not defined in config_context.stp
+{% endif %}
+
 {% if host.interfaces is defined and host.interfaces | length > 0 %}
 {% with interfaces = host.interfaces %}
 {% include 'common/cisco/interfaces.j2' %}
@@ -32,35 +32,43 @@
 {% else %}
 ! No interfaces defined in host.interfaces
 {% endif %}
-{#!#}
-{#{% if host.config_context is defined and host.config_context.cisco_snmp_ios is defined %}#}
-{#{% include 'common/cisco/snmp.j2' %}#}
-{#{% else %}#}
-{#! SNMP not defined in config_context.cisco_snmp_ios#}
-{#{% endif %}#}
-{#!#}
-{#{% include 'common/cisco/banner.j2' %}#}
-{#!#}
-{#{% if host.config_context is defined and host.config_context.vrfs is defined %}#}
-{#{% include 'common/cisco/vrfs.j2' %}#}
-{#{% else %}#}
-{#! VRFs not defined in host.vrfs#}
-{#{% endif %}#}
-{#!#}
-{#{% if host.config_context is defined and host.config_context.line_configs is defined %}#}
-{#{% include 'common/cisco/line_configs.j2' %}#}
-{#{% else %}#}
-{#! Line configurations not defined in config_context.line_configs#}
-{#{% endif %}#}
-{#!#}
-{#{% if host.config_context is defined and host.config_context.site_pedc is defined and host.config_context.syslog is defined %}#}
-{#{% include 'common/cisco/ip_settings.j2' %}#}
-{#{% else %}#}
-{#! IP settings not fully defined (need site_pedc and/or syslog)#}
-{#{% endif %}#}
-{#!#}
-{#{% if host.config_context is defined and host.config_context.ntp is defined %}#}
-{#{% include 'common/cisco/ntp.j2' %}#}
-{#{% else %}#}
-{#! NTP not defined in config_context.ntp#}
-{#{% endif %}#}
+!
+{% if host.config_context is defined and host.config_context.cisco_snmp_ios is defined %}
+{% include 'common/cisco/snmp.j2' %}
+{% else %}
+! SNMP not defined in config_context.cisco_snmp_ios
+{% endif %}
+!
+{% include 'common/cisco/banner.j2' %}
+!
+{% if host.config_context is defined and host.config_context.vrfs is defined %}
+{% include 'common/cisco/vrfs.j2' %}
+{% else %}
+! VRFs not defined in host.vrfs
+{% endif %}
+!
+{% if host.config_context is defined and host.config_context.line_configs is defined %}
+{% include 'common/cisco/line_configs.j2' %}
+{% else %}
+! Line configurations not defined in config_context.line_configs
+{% endif %}
+!
+{% if host.config_context is defined and host.config_context.site_pedc is defined and host.config_context.syslog is defined %}
+{% include 'common/cisco/ip_settings.j2' %}
+{% else %}
+! IP settings not fully defined (need site_pedc and/or syslog)
+{% endif %}
+!
+{% if host.config_context is defined and host.config_context.ntp is defined %}
+{% include 'common/cisco/ntp.j2' %}
+{% else %}
+! NTP not defined in config_context.ntp
+{% endif %} #}
+
+!
+{# {% if host.config_context is defined and host.config_context.ospf is defined and host.config_context.ospf.global is defined %} #}
+{% include 'common/cisco/ospf.j2' %}
+{# {% else %}
+! OSPF not configured (ospf or ospf.global not defined in config_context)
+{% endif %}
+! #}
