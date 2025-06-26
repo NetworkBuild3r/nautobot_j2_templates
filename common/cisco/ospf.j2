@@ -27,9 +27,6 @@ router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
 {% endif %}
  network {{ ip }} {{ wildcard }} area {{ host.config_context.ospf.area }}
 {% endfor %}
-{% for ospf_intf in host.config_context.ospf.interfaces if ospf_intf.name not in host.interfaces|map(attribute='name')|list %}
- ! interface {{ ospf_intf.name }} in OSPF config but not assigned to device, skipping network statement
-{% endfor %}
 {% else %}
  ! missing loopback_ip or area in config_context.ospf
 {% endif %}

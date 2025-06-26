@@ -20,6 +20,7 @@
 {%- endif %}
 {% else %}
  storm-control action shutdown
+{%- endif %}
 {%- endmacro %}
 
 {% set ospf_interfaces = host.config_context.ospf.interfaces|default([])|map(attribute='name')|list %}
@@ -85,8 +86,6 @@ interface {{ intf.name }}
 {% if intf._custom_field_data.get('dhcp_snooping_trust') %}
  ip dhcp snooping trust
 {% endif %}
-{% elif intf.name.startswith('Vlan') %}
- no switchport
 {% endif %}
 {% if intf.name in ospf_interfaces %}
 {% set ospf_intf = host.config_context.ospf.interfaces|selectattr('name', 'equalto', intf.name)|first %}
@@ -115,7 +114,12 @@ interface {{ intf.name }}
  ! interface {{ intf.name }} in OSPF config but has no IP address, skipping OSPF configuration
 {% endif %}
 {% else %}
- ! interface {{ intf.name }} not assigned to OSPF configuration
+{% set device_interfaces = interfaces|map(attribute='name')|list %}
+{% if host.config_context.ospf and host.config_context.ospf.interfaces %}
+{% for ospf_intf in host.config_context.ospf.interfaces if ospf_intf.name not in device_interfaces %}
+ ! interface {{ ospf_intf.name }} in OSPF config but not assigned to device, skipping OSPF configuration
+{% endfor %}
+{% endif %}
 {% endif %}
 {% if intf.enabled %}
  no shutdown
