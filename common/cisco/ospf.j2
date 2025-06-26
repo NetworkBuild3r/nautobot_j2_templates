@@ -19,11 +19,11 @@ interface {{ intf.name }}
 {% else %}
  ! missing md5_key for interface {{ intf.name }}
 {% endif %}
-{% if intf.network_type %}
+{% if intf.network_type is defined %}
  ip ospf network {{ intf.network_type }}
 {% else %}
- ip ospf network {{ 'point-to-point' if intf.type == 'port-channel' or intf.type == 'physical' else 'broadcast' }}
- ! default network_type applied for {{ intf.name }}
+ ip ospf network {{ 'point-to-point' if intf.type in ['port-channel', 'physical'] else 'broadcast' }}
+ ! missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.type in ['port-channel', 'physical'] else 'broadcast' }}
 {% endif %}
 !
 {% else %}
@@ -51,15 +51,11 @@ router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
  ! missing area_type in ospf_group
 {% endif %}
 {% for intf in host.config_context.ospf.interfaces if intf.ip_address %}
-{% set ip_parts = intf.ip_address.split('/') %}
-{% set ip = ip_parts[0] %}
-{% set prefix = ip_parts[1]|int %}
-{% set wildcard = '0.0.0.0' %}
-{% if prefix < 32 %}
- {% set mask = (2 ** (32 - prefix) - 1)|ip_wildcard %}
- {% set wildcard = mask %}
+{% if intf.network and intf.wildcard %}
+ network {{ intf.network }} {{ intf.wildcard }} area {{ host.config_context.ospf.area }}
+{% else %}
+ ! missing network or wildcard for interface {{ intf.name }}
 {% endif %}
- network {{ ip }} {{ wildcard }} area {{ host.config_context.ospf.area }}
 {% endfor %}
 {% else %}
  ! missing loopback_ip or area in config_context.ospf
