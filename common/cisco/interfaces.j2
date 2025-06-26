@@ -105,22 +105,13 @@ interface {{ intf.name }}
  ! missing md5_key for interface {{ intf.name }}
 {% endif %}
 {% if ospf_intf.network_type is defined %}
-
  ip ospf network {{ ospf_intf.network_type }}
 {% else %}
-
  ip ospf network {{ 'point-to-point' if intf.name.startswith('Port-channel') or intf.name.startswith('Loopback') else 'broadcast' }}
  ! missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.name.startswith('Port-channel') or intf.name.startswith('Loopback') else 'broadcast' }}
 {% endif %}
 {% else %}
  ! interface {{ intf.name }} in OSPF config but has no IP address, skipping OSPF configuration
-{% endif %}
-{% else %}
-{% set device_interfaces = interfaces|map(attribute='name')|list %}
-{% if host.config_context.ospf and host.config_context.ospf.interfaces %}
-{% for ospf_intf in host.config_context.ospf.interfaces if ospf_intf.name not in device_interfaces %}
- ! interface {{ ospf_intf.name }} in OSPF config but not assigned to device, skipping OSPF configuration
-{% endfor %}
 {% endif %}
 {% endif %}
 {% if intf.enabled %}
