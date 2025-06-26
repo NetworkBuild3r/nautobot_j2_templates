@@ -2,7 +2,9 @@
 !
 ! OSPF interface configurations (adding OSPF-specific settings to existing interfaces)
 {% if host.config_context.ospf and host.config_context.ospf.interfaces %}
+{% set device_interfaces = host.interfaces|map(attribute='name')|list %}
 {% for intf in host.config_context.ospf.interfaces %}
+{% if intf.name in device_interfaces %}
 {% if intf.ip_address %}
 interface {{ intf.name }}
 {% if intf.apply_helper|default(false) and intf.name != 'Vlan1000' %}
@@ -22,12 +24,15 @@ interface {{ intf.name }}
 {% if intf.network_type is defined %}
  ip ospf network {{ intf.network_type }}
 {% else %}
- ip ospf network {{ 'point-to-point' if intf.type in ['port-channel', 'physical'] else 'broadcast' }}
- ! missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.type in ['port-channel', 'physical'] else 'broadcast' }}
+ ip ospf network {{ 'point-to-point' if intf.type in ['port-channel', 'physical', 'loopback'] else 'broadcast' }}
+ ! missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.type in ['port-channel', 'physical', 'loopback'] else 'broadcast' }}
 {% endif %}
 !
 {% else %}
  ! missing ip_address for interface {{ intf.name }} in ospf.interfaces
+{% endif %}
+{% else %}
+ ! interface {{ intf.name }} not found in device interfaces
 {% endif %}
 {% endfor %}
 {% else %}
@@ -50,7 +55,7 @@ router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
 {% else %}
  ! missing area_type in ospf_group
 {% endif %}
-{% for intf in host.config_context.ospf.interfaces if intf.ip_address %}
+{% for intf in host.config_context.ospf.interfaces if intf.ip_address and intf.name in device_interfaces %}
 {% if intf.network and intf.wildcard %}
  network {{ intf.network }} {{ intf.wildcard }} area {{ host.config_context.ospf.area }}
 {% else %}
