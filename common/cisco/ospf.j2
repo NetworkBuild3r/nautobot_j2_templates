@@ -4,8 +4,10 @@
 {% if host.config_context.ospf and host.config_context.ospf.interfaces %}
 {% set device_interfaces = host.interfaces|map(attribute='name')|list %}
 {% for intf in host.config_context.ospf.interfaces %}
-{% if intf.name in device_interfaces %}
 {% if intf.ip_address %}
+{% if intf.name not in device_interfaces %}
+ ! interface {{ intf.name }} not found in device interfaces
+{% endif %}
 interface {{ intf.name }}
 {% if intf.apply_helper|default(false) and intf.name != 'Vlan1000' %}
  {% if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
@@ -31,16 +33,13 @@ interface {{ intf.name }}
 {% else %}
  ! missing ip_address for interface {{ intf.name }} in ospf.interfaces
 {% endif %}
-{% else %}
- ! interface {{ intf.name }} not found in device interfaces
-{% endif %}
 {% endfor %}
 {% else %}
  ! missing ospf.interfaces in config_context
 {% endif %}
 !
 ! OSPF process configuration
-{% if host.config_context.ospf and host.config_context.ospf.loopback_ip and host.config_context.ospf.area %}
+{% if host.config_context.ospf and host.config_context.ospf.loopback_ip and host.config_context.ospfButler.area %}
 router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
  router-id {{ host.config_context.ospf.loopback_ip }}
 {% if host.config_context.ospf_group and host.config_context.ospf_group.global_settings.ignore_lsa_mospf %}
@@ -55,7 +54,7 @@ router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
 {% else %}
  ! missing area_type in ospf_group
 {% endif %}
-{% for intf in host.config_context.ospf.interfaces if intf.ip_address and intf.name in device_interfaces %}
+{% for intf in host.config_context.ospf.interfaces if intf.ip_address %}
 {% if intf.network and intf.wildcard %}
  network {{ intf.network }} {{ intf.wildcard }} area {{ host.config_context.ospf.area }}
 {% else %}
