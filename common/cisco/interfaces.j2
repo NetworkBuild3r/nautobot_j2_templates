@@ -105,6 +105,7 @@ interface {{ intf.name }}
  ! missing md5_key for interface {{ intf.name }}
 {% endif %}
 {% if ospf_intf.network_type is defined %}
+
  ip ospf network {{ ospf_intf.network_type }}
 {% else %}
 
