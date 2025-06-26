@@ -25,6 +25,7 @@ router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
  {% set mask = (2 ** (32 - prefix) - 1)|ip_wildcard %}
  {% set wildcard = mask %}
 {% endif %}
+
  network {{ ip }} {{ wildcard }} area {{ host.config_context.ospf.area }}
 {% endfor %}
 {% else %}
