@@ -39,7 +39,7 @@ interface {{ intf.name }}
 {% endif %}
 !
 ! OSPF process configuration
-{% if host.config_context.ospf and host.config_context.ospf.loopback_ip and host.config_context.ospfButler.area %}
+{% if host.config_context.ospf and host.config_context.ospf.loopback_ip and host.config_context.ospf.area %}
 router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
  router-id {{ host.config_context.ospf.loopback_ip }}
 {% if host.config_context.ospf_group and host.config_context.ospf_group.global_settings.ignore_lsa_mospf %}
