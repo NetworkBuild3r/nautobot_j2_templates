@@ -1,0 +1,67 @@
+! OSPF Configuration for {{ device.hostname|default('unknown device') }}
+!
+! OSPF interface configurations (adding OSPF-specific settings to existing interfaces)
+{% if device.config_context.ospf and device.config_context.ospf.interfaces %}
+{% for intf in device.config_context.ospf.interfaces %}
+{% if intf.ip_address %}
+interface {{ intf.name }}
+{% if intf.apply_helper|default(false) and intf.name != 'Vlan1000' %}
+ {% if device.config_context.ospf_group.helper_addresses %}
+ {% for helper in device.config_context.ospf_group.helper_addresses %}
+ ip helper-address {{ helper }}
+ {% endfor %}
+ {% else %}
+ ! missing helper_addresses in ospf_group for {{ intf.name }}
+ {% endif %}
+{% endif %}
+{% if intf.md5_key %}
+ ip ospf message-digest-key {{ intf.md5_key }} md5 7 {{ device.config_context.ospf_group.md5_secret|default('missing_md5_secret') }}
+{% else %}
+ ! missing md5_key for interface {{ intf.name }}
+{% endif %}
+{% if intf.network_type %}
+ ip ospf network {{ intf.network_type }}
+{% else %}
+ ip ospf network {{ 'point-to-point' if intf.type == 'port-channel' or intf.type == 'physical' else 'broadcast' }}
+ ! default network_type applied for {{ intf.name }}
+{% endif %}
+!
+{% else %}
+ ! missing ip_address for interface {{ intf.name }} in ospf.interfaces
+{% endif %}
+{% endfor %}
+{% else %}
+ ! missing ospf.interfaces in config_context
+{% endif %}
+!
+! OSPF process configuration
+{% if device.config_context.ospf.loopback_ip and device.config_context.ospf.area %}
+router ospf {{ device.config_context.ospf_group.process_id|default(1) }}
+ router-id {{ device.config_context.ospf.loopback_ip }}
+{% if device.config_context.ospf_group.global_settings.ignore_lsa_mospf %}
+ ignore lsa mospf
+{% endif %}
+{% if device.config_context.ospf_group.global_settings.log_adjacency_changes %}
+ log-adjacency-changes {{ device.config_context.ospf_group.global_settings.log_adjacency_changes }}
+{% endif %}
+ area {{ device.config_context.ospf.area }} authentication message-digest
+{% if device.config_context.ospf_group.area_type %}
+ area {{ device.config_context.ospf.area }} {{ device.config_context.ospf_group.area_type }}{% if device.config_context.ospf_group.area_options %} {{ device.config_context.ospf_group.area_options|join(' ') }}{% endif %}
+{% else %}
+ ! missing area_type in ospf_group
+{% endif %}
+{% for intf in device.config_context.ospf.interfaces if intf.ip_address %}
+{% set ip_parts = intf.ip_address.split('/') %}
+{% set ip = ip_parts[0] %}
+{% set prefix = ip_parts[1]|int %}
+{% set wildcard = '0.0.0.0' %}
+{% if prefix < 32 %}
+ {% set mask = (2 ** (32 - prefix) - 1)|ip_wildcard %}
+ {% set wildcard = mask %}
+{% endif %}
+ network {{ ip }} {{ wildcard }} area {{ device.config_context.ospf.area }}
+{% endfor %}
+{% else %}
+ ! missing loopback_ip or area in config_context.ospf
+{% endif %}
+!
