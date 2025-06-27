@@ -135,8 +135,8 @@ interface {{ intf.name }}
 {%- if intf.ip_addresses %}
  ip ospf {{ ospf_config.process_id | default(1) }} area {{ ospf_config.area | default('0.0.0.0') }}
 {%- if ospf_intf.apply_helper | default(false) and intf.name != 'vlan1000' %}
-{%- if ospf_config.ospf_group and ospf_config.ospf_group.helper_addresses %}
-{%- for helper in ospf_config.ospf_group.helper_addresses %}
+{%- if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
+{%- for helper in host.config_context.ospf_group.helper_addresses %}
  ip helper-address {{ helper }}
 {%- endfor %}
 {%- else %}
@@ -144,7 +144,7 @@ interface {{ intf.name }}
 {%- endif %}
 {%- endif %}
 {%- if ospf_intf.md5_key %}
- ip ospf message-digest-key {{ ospf_intf.md5_key }} md5 7 {{ ospf_config.ospf_group.md5_secret | default('ospf_digest') }}
+ ip ospf message-digest-key {{ ospf_intf.md5_key }} md5 7 {{ host.config_context.ospf_group.md5_secret | default('ospf_digest') }}
 {%- else %}
  ! warning: Missing md5_key for interface {{ intf.name }}
 {%- endif %}
