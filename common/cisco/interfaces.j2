@@ -158,3 +158,33 @@ interface {{ intf.name }}
    {%- if ospf_intf.apply_helper | default(false) and intf.name | lower != 'vlan1000' %}
     {%- if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
      {%- for helper in host.config_context.ospf_group.helper_addresses %}
+      ip helper-address {{ helper }}
+     {%- endfor %}
+    {%- else %}
+     ! warning: Missing helper_addresses in ospf_group for {{ intf.name }}
+    {%- endif %}
+   {%- endif %}
+   {%- if ospf_intf.md5_key %}
+    ip ospf message-digest-key {{ ospf_intf.md5_key }} md5 7 {{ host.config_context.ospf_group.md5_secret | default('ospf_digest') }}
+   {%- else %}
+    ! warning: Missing md5_key for interface {{ intf.name }}
+   {%- endif %}
+   {%- if ospf_intf.network_type %}
+    ip ospf network {{ ospf_intf.network_type }}
+   {%- else %}
+    ip ospf network {{ 'point-to-point' if intf.name | lower.startswith('loopback') or intf.name | lower.startswith('port-channel') else 'broadcast' }}
+    ! warning: Missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.name | lower.startswith('loopback') or intf.name | lower.startswith('port-channel') else 'broadcast' }}
+   {%- endif %}
+  {%- else %}
+   ! warning: Interface {{ intf.name }} in OSPF config but has no IP address
+  {%- endif %}
+ {%- endif %}
+
+ {# Interface state #}
+ {%- if intf.enabled | default(true) %}
+  no shutdown
+ {%- else %}
+  shutdown
+ {%- endif %}
+!
+{% endfor %}
