@@ -23,8 +23,16 @@
 {%- endif %}
 {%- endmacro %}
 
-{% set ospf_interfaces = host.config_context.ospf.interfaces|default([])|map(attribute='name')|list %}
-{% for intf in interfaces | sort(attribute='name') %}
+{# Aggregate interfaces #}
+{% set device_ifcs = host.interfaces | default([]) %}
+{% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
+{% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') %}
+
+! Debug: Found {{ all_ifcs | length }} interfaces
+
+{% set ospf_interfaces = host.config_context.ospf.interfaces | default([]) | map(attribute='name') | list %}
+
+{% for intf in all_ifcs | sort(attribute='name') %}
 interface {{ intf.name }}
 {% if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
  description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
@@ -88,9 +96,9 @@ interface {{ intf.name }}
 {% endif %}
 {% endif %}
 {% if intf.name in ospf_interfaces %}
-{% set ospf_intf = host.config_context.ospf.interfaces|selectattr('name', 'equalto', intf.name)|first %}
+{% set ospf_intf = host.config_context.ospf.interfaces | selectattr('name', 'equalto', intf.name) | first %}
 {% if intf.ip_addresses %}
-{% if ospf_intf.apply_helper|default(false) and intf.name != 'Vlan1000' %}
+{% if ospf_intf.apply_helper | default(false) and intf.name != 'Vlan1000' %}
  {% if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
  {% for helper in host.config_context.ospf_group.helper_addresses %}
  ip helper-address {{ helper }}
@@ -100,7 +108,7 @@ interface {{ intf.name }}
  {% endif %}
 {% endif %}
 {% if ospf_intf.md5_key %}
- ip ospf message-digest-key {{ ospf_intf.md5_key }} md5 7 {% raw %}{{ "{% endraw %}{{ host.config_context.ospf_group.md5_secret }}{% raw %}" | get_secret_by_secret_group_name("key") }}{% endraw %}
+ ip ospf message-digest-key {{ ospf_intf.md5_key }} md5 7 {{ host.config_context.ospf_group.md5_secret | default('ospf_digest') }}
 {% else %}
  ! missing md5_key for interface {{ intf.name }}
 {% endif %}
