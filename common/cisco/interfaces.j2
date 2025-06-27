@@ -26,7 +26,7 @@
 {# Aggregate all interfaces, handling devices with or without module bays #}
 {% set device_ifcs = host.interfaces | default([]) %}
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
-{% set all_ifcs = list((device_ifcs + module_ifcs) | unique(attribute='name')) %}
+{% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') | list %}
 
 ! Debug: Found {{ all_ifcs | length }} interfaces
 
