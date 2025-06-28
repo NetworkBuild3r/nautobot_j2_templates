@@ -43,16 +43,13 @@ interface {{ intf.name }}
   ! warning: No description available for {{ intf.name }}
  {%- endif %}
 
- {# Determine interface mode: routed (IP), access/trunk (VLANs), or default #}
- {%- set inferred_mode = 'routed' if intf.ip_addresses else 'access' if (intf.untagged_vlan or intf.tagged_vlans) else intf.mode | default('access') %}
- {%- set is_switchport = inferred_mode in ['access', 'tagged', 'tagged_all'] %}
+ {# Determine interface mode: routed (IP, no VLANs), access (VLANs or default), trunk (tagged VLANs or Port-channel/LAG) #}
+ {%- set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL'] or intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name)) else 'access' %}
+ {%- set is_switchport = inferred_mode in ['access', 'trunk'] %}
  {%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
 
  {# IP address for routed interfaces #}
- {%- if intf.ip_addresses and not is_switchport %}
-  ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
- {%- elif is_switchport and intf.ip_addresses %}
-  ! warning: IP address assigned to switchport {{ intf.name }}, treating as routed
+ {%- if inferred_mode == 'routed' %}
   no switchport
   ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
  {%- endif %}
@@ -99,7 +96,7 @@ interface {{ intf.name }}
    {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
     ip dhcp snooping trust
    {%- endif %}
-  {%- elif inferred_mode in ['tagged', 'tagged_all'] or is_uplink %}
+  {%- elif inferred_mode == 'trunk' %}
    switchport mode trunk
    {%- if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
     switchport trunk native vlan 1000
@@ -127,9 +124,6 @@ interface {{ intf.name }}
     ip dhcp snooping trust
    {%- endif %}
   {%- endif %}
- {%- else %}
-  no switchport
-  ! warning: Interface {{ intf.name }} treated as routed due to IP or no VLANs
  {%- endif %}
 
  {# OSPF configuration for interfaces #}
