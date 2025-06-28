@@ -23,27 +23,7 @@
  {%- endif %}
 {%- endmacro %}
 
-{# Global OSPF configuration #}
-{%- if host.config_context.ospf or host.config_context.ospf_group %}
-router ospf {{ host.config_context.ospf_group.process_id | default(1) }}
- {%- if host.config_context.ospf.loopback_ip %}
-  router-id {{ host.config_context.ospf.loopback_ip }}
- {%- endif %}
- {%- if host.config_context.ospf_group.global_settings.ignore_lsa_mospf %}
-  ignore lsa mospf
- {%- endif %}
- {%- if host.config_context.ospf_group.global_settings.log_adjacency_changes %}
-  log-adjacency-changes {{ host.config_context.ospf_group.global_settings.log_adjacency_changes }}
- {%- endif %}
- {%- if host.config_context.ospf.area %}
-  area {{ host.config_context.ospf.area }} authentication message-digest
-  area {{ host.config_context.ospf.area }} {{ host.config_context.ospf_group.area_type | default('stub') }} {{ host.config_context.ospf_group.area_options | default([]) | join(' ') }}
-  network {{ host.config_context.ospf.loopback_ip | default('0.0.0.0') }} 0.0.0.0 area {{ host.config_context.ospf.area }}
- {%- endif %}
-!
-{%- endif %}
-
-{# Aggregate all interfaces (handle devices with or without module bays) #}
+{# Aggregate all interfaces #}
 {% set all_ifcs = host.interfaces | default([]) %}
 ! Found {{ all_ifcs | length }} interfaces for device {{ host.hostname | default('unknown') }}
 
@@ -64,7 +44,7 @@ interface {{ intf.name }}
  {# Determine interface mode: routed (IP), access/trunk (VLANs), or default #}
  {%- set inferred_mode = 'routed' if intf.ip_addresses else 'access' if (intf.untagged_vlan or intf.tagged_vlans) else intf.mode | default('access') %}
  {%- set is_switchport = inferred_mode in ['access', 'tagged', 'tagged_all'] %}
- {%- set is_uplink = intf.name | lower.startswith('port-channel') or (intf.lag and intf.lag.name) %}
+ {%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
 
  {# IP address for routed interfaces #}
  {%- if intf.ip_addresses and not is_switchport %}
@@ -139,7 +119,7 @@ interface {{ intf.name }}
    switchport nonegotiate
    {{ render_storm_control(intf, is_uplink=is_uplink) | indent(2) }}
    {%- if intf.lag and intf.lag.name %}
-    channel-group {{ intf.lag.name | replace('port-channel', '') | lower }} mode active
+    channel-group {{ intf.lag.name | replace('Port-channel', '') | lower }} mode active
    {%- endif %}
    {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
     ip dhcp snooping trust
@@ -155,7 +135,7 @@ interface {{ intf.name }}
   {%- set ospf_intf = ospf_config.interfaces | selectattr('name', 'equalto', intf.name) | first %}
   {%- if intf.ip_addresses %}
    ip ospf {{ host.config_context.ospf_group.process_id | default(1) }} area {{ ospf_config.area | default('0.0.0.0') }}
-   {%- if ospf_intf.apply_helper | default(false) and intf.name | lower != 'vlan1000' %}
+   {%- if ospf_intf.apply_helper | default(false) and intf.name.lower() != 'vlan1000' %}
     {%- if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
      {%- for helper in host.config_context.ospf_group.helper_addresses %}
       ip helper-address {{ helper }}
@@ -172,8 +152,8 @@ interface {{ intf.name }}
    {%- if ospf_intf.network_type %}
     ip ospf network {{ ospf_intf.network_type }}
    {%- else %}
-    ip ospf network {{ 'point-to-point' if intf.name | lower.startswith('loopback') or intf.name | lower.startswith('port-channel') else 'broadcast' }}
-    ! warning: Missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.name | lower.startswith('loopback') or intf.name | lower.startswith('port-channel') else 'broadcast' }}
+    ip ospf network {{ 'point-to-point' if intf.name.lower().startswith('loopback') or intf.name.lower().startswith('port-channel') else 'broadcast' }}
+    ! warning: Missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.name.lower().startswith('loopback') or intf.name.lower().startswith('port-channel') else 'broadcast' }}
    {%- endif %}
   {%- else %}
    ! warning: Interface {{ intf.name }} in OSPF config but has no IP address
