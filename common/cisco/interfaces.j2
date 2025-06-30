@@ -38,8 +38,8 @@ interface {{ intf.name }}
  {%- endif %}
 
  {# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL), access (untagged VLAN or ACCESS), or none #}
- {%- set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else null %}
- {%- set is_switchport = inferred_mode in ['access', 'trunk'] %}
+ {%- set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else none %}
+ {%- set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
  {%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
 
  {# IP address for routed interfaces #}
@@ -67,7 +67,7 @@ interface {{ intf.name }}
  switchport mode trunk
    {%- if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
  switchport trunk native vlan 1000
-   {%- elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+   %- elif intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
    {%- endif %}
    {%- set vlan_list = [] %}
