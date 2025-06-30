@@ -1,22 +1,22 @@
 {%- macro render_storm_control(intf, is_uplink=False) %}
- {%- if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
+{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
   storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
- {%- elif is_uplink %}
+{% elif is_uplink %}
   storm-control broadcast level bps 20m
- {%- endif %}
- {%- if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
-  {%- set action_val = intf._custom_field_data.get('storm_control_action') %}
-  {%- if action_val is string %}
-   {%- set action = action_val %}
-  {%- elif action_val is iterable and action_val | length > 0 %}
-   {%- set action = action_val[0] %}
-  {%- else %}
-   {%- set action = none %}
-  {%- endif %}
-  {%- if action and action != 'drop' %}
+{%- endif %}
+{%- if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
+{%- set action_val = intf._custom_field_data.get('storm_control_action') %}
+{%- if action_val is string %}
+{%- set action = action_val %}
+{%- elif action_val is iterable and action_val | length > 0 %}
+{%- set action = action_val[0] %}
+{%- else %}
+{%- set action = none %}
+{%- endif %}
+{% if action and action != 'drop' %}
   storm-control action {{ action }}
-  {%- endif %}
- {%- endif %}
+{%- endif %}
+{%- endif %}
 {%- endmacro %}
 
 {# Aggregate all interfaces, including module interfaces if present #}
@@ -33,30 +33,28 @@
 interface {{ intf.name }}
  {%- if intf.description %}
  description {{ intf.description }}
- {%- elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
+{%- elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
  description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
- {%- endif %}
-
+{%- endif %}
  {# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL), access (untagged VLAN or ACCESS), or none #}
- {%- set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else none %}
- {%- set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
- {%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
-
+{%- set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else none %}
+{%- set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
+{%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
  {# IP address for routed interfaces #}
- {%- if inferred_mode == 'routed' -%}
+{%- if inferred_mode == 'routed' -%}
  no switchport
  ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
- {%- endif %}
+{%- endif %}
 
  {# Switchport configuration #}
- {%- if is_switchport %}
-  {%- if inferred_mode == 'access' %}
+{%- if is_switchport %}
+{%- if inferred_mode == 'access' %}
  switchport mode access
 {% if intf._custom_field_data.get('vlan_type') in ['data', 'video', 'security'] and intf._custom_field_data.get(intf._custom_field_data.vlan_type + '_vlan') %}
  switchport access vlan {{ intf._custom_field_data[intf._custom_field_data.vlan_type + '_vlan'] }}
 {% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport access vlan {{ intf.untagged_vlan.vid }}
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('cf_voice_vlan') %}
  switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
 {% elif intf._custom_field_data.get('voice_vlan') %}
@@ -133,11 +131,10 @@ interface {{ intf.name }}
 ! warning: Interface {{ intf.name }} in OSPF config but has no IP address
 {%- endif %}
 {%- endif %}
-
  {# Interface state #}
- {%- if intf.enabled | default(true) -%}
+{%- if intf.enabled | default(true) %}
  no shutdown
- {%- else -%}
+{%- else -%}
  shutdown
  {% endif %}
 !
