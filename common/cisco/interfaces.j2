@@ -60,8 +60,8 @@ interface {{ intf.name }}
 {% elif intf.name.lower() == 'vlan1000' %}
  description MANAGEMENT INTERFACE
 {% endif %}
-{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL), access (untagged VLAN or ACCESS), stackwise-virtual, or none #}
-{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
+{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL with tagged_vlans), access (untagged VLAN or ACCESS), stackwise-virtual, or none #}
+{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
 {% set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
 {% set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
 {# Stackwise-Virtual configuration #}
