@@ -3,6 +3,8 @@
  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
 {%- elif is_uplink %}
  storm-control broadcast level bps 20m
+{%- elif intf.mode == 'ACCESS' %}
+ storm-control broadcast level 40.00
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {% set action_val = intf._custom_field_data.get('storm_control_action') %}
@@ -59,6 +61,8 @@ interface {{ intf.name }}
  description {{ intf.description }}
 {% elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
  description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
+{% elif intf.name.lower() == 'vlan1000' %}
+ description MANAGEMENT INTERFACE
 {% endif %}
 {# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL), access (untagged VLAN or ACCESS), stackwise-virtual, or none #}
 {% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
@@ -134,8 +138,9 @@ interface {{ intf.name }}
 {%- else %}
  ! warning: No tagged VLANs defined for {{ intf.name }}
 {% endif %}
+ switchport nonegotiate
 {% endif %}
-{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink %}
+{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink or intf.mode == 'ACCESS' %}
 {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
 {% endif %}
 {% if intf._custom_field_data.get('portfast') %}
