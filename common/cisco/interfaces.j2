@@ -55,7 +55,7 @@
 #  Classify every interface and put them in Cisco-friendly order
 # -------------------------------------------------------------------- #}
 
-{% from 'netutils_filters.j2' import sort_interface_list with context %}
+{% from 'interface_filters.j2' import sort_interface_list with context %}
 
 {% set physical_ifcs     = [] %}
 {% set po_ifcs           = [] %}
@@ -169,7 +169,7 @@ interface {{ intf.name }}
  switchport nonegotiate
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
-{{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
+{{ render_ospf(intf, ospf_config) | indent(1) }}
 {% endif %}
 {% if intf._custom_field_data.get('portfast') %}
  spanning-tree portfast
