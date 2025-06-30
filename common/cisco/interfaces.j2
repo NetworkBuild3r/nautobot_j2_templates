@@ -1,10 +1,10 @@
 {%- macro render_storm_control(intf, is_uplink=False) %}
- {%- if intf._custom_field_data.get('storm_control_level') not in [null, ''] %}
+ {%- if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
   storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
  {%- elif is_uplink %}
   storm-control broadcast level bps 20m
  {%- endif %}
- {%- if intf._custom_field_data.get('storm_control_action') not in [null, ''] %}
+ {%- if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
   {%- set action_val = intf._custom_field_data.get('storm_control_action') %}
   {%- if action_val is string %}
    {%- set action = action_val %}
@@ -67,7 +67,7 @@ interface {{ intf.name }}
  switchport mode trunk
    {%- if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
  switchport trunk native vlan 1000
-   %- elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+   {%- elif intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
    {%- endif %}
    {%- set vlan_list = [] %}
@@ -84,7 +84,7 @@ interface {{ intf.name }}
    {%- endif %}
  switchport nonegotiate
   {%- endif %}
-  {%- if intf._custom_field_data.get('storm_control_level') not in [null, ''] or is_uplink %}
+  {%- if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink %}
  {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
   {%- endif %}
   {%- if intf._custom_field_data.get('portfast') %}
