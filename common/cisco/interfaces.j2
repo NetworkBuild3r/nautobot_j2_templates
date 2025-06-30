@@ -75,12 +75,10 @@ interface {{ intf.name }}
 {%- if intf._custom_field_data.get('security_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('security_vlan')) %}{% endif %}
 {% if vlan_list %}
  switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
-{%- elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
+{% elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
 {%- else %}
 ! warning: No tagged VLANs defined for {{ intf.name }}
-{% endif %}
- switchport nonegotiate
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink %}
 
@@ -117,14 +115,14 @@ interface {{ intf.name }}
 ! warning: Missing helper_addresses in ospf_group for {{ intf.name }}
 {%- endif %}
 {%- endif %}
-{%- if ospf_intf.md5_key %}
+{% if ospf_intf.md5_key %}
  ip ospf message-digest-key {{ ospf_intf.md5_key }} md5 7 {{ host.config_context.ospf_group.md5_secret | default('ospf_digest') }}
 {%- else %}
 ! warning: Missing md5_key for interface {{ intf.name }}
 {%- endif %}
-{%- if ospf_intf.network_type %}
+{% if ospf_intf.network_type %}
  ip ospf network {{ ospf_intf.network_type }}
-{%- else %}
+{% else %}
  ip ospf network {{ 'point-to-point' if intf.name.lower().startswith('loopback') or intf.name.lower().startswith('port-channel') else 'broadcast' }}
 ! warning: Missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.name.lower().startswith('loopback') or intf.name.lower().startswith('port-channel') else 'broadcast' }}
 {%- endif %}
@@ -133,7 +131,7 @@ interface {{ intf.name }}
 {%- endif %}
 {%- endif %}
  {# Interface state #}
-{%- if intf.enabled | default(true) %}
+{% if intf.enabled | default(true) %}
  no shutdown
 {% else %}
  shutdown
