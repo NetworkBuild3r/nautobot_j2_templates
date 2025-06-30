@@ -47,16 +47,45 @@
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
 {% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') | sort(attribute='name') | list %}
 
-{# Split interfaces into physical, port-channels, SVIs, and others for correct order #}
-{% set physical_ifcs = [] %}
+{# OSPF configuration data #}
+{% set ospf_config = host.config_context.ospf | default({}) %}
+{% set ospf_interfaces = ospf_config.interfaces | default([]) | map(attribute='name') | list %}
+
+{# --------------------------------------------------------------------
+#  Classify every interface and put them in Cisco-friendly order
+# -------------------------------------------------------------------- #}
+
+{% from 'netutils_filters.j2' import sort_interface_list with context %}
+
+{% set physical_ifcs     = [] %}
+{% set po_ifcs           = [] %}
+{% set svi_ifcs          = [] %}
+{% set other_ifcs        = [] %}
+
+{# --- 1. Put each interface in the right bucket -------------------- #}
 {% for intf in all_ifcs %}
-{% if intf.name.startswith('GigabitEthernet') or intf.name.startswith('TenGigabitEthernet') or intf.name.startswith('TwentyFiveGigE') or intf.name.startswith('FortyGigabitEthernet') or intf.name.startswith('HundredGigE') or intf.name.startswith('TweLine Card') %}
-{% set _ = physical_ifcs.append(intf) %}
-{% endif %}
+  {% if   intf.name.startswith(
+         ('GigabitEthernet', 'TenGigabitEthernet',
+          'TwentyFiveGigE',  'FortyGigabitEthernet',
+          'HundredGigE',     'TweLine Card')) %}
+        {% set _ = physical_ifcs.append(intf) %}
+
+  {% elif intf.name|lower startswith 'port-channel' %}
+        {% set _ = po_ifcs.append(intf) %}
+
+  {% elif intf.name|lower startswith 'vlan' %}
+        {% set _ = svi_ifcs.append(intf) %}
+
+  {% else %}
+        {% set _ = other_ifcs.append(intf) %}
+  {% endif %}
 {% endfor %}
-{% set port_channel_ifcs = [intf for intf in all_ifcs if intf.name.lower().startswith('port-channel')] %}
-{% set vlan_ifcs = [intf for intf in all_ifcs if intf.name.lower().startswith('vlan')] %}
-{% set other_ifcs = [intf for intf in all_ifcs if not (intf.name.startswith('GigabitEthernet') or intf.name.startswith('TenGigabitEthernet') or intf.name.startswith('TwentyFiveGigE') or intf.name.startswith('FortyGigabitEthernet') or intf.name.startswith('HundredGigE') or intf.name.startswith('TweLine Card') or intf.name.lower().startswith('port-channel') or intf.name.lower().startswith('vlan'))] %}
+
+{# --- 2. Natural-sort each bucket ---------------------------------- #}
+{% set physical_ifcs = sort_interface_list(physical_ifcs, attr='name') %}
+{% set po_ifcs       = po_ifcs       | sort(attribute='name') %}
+{% set svi_ifcs      = svi_ifcs      | sort(attribute='name') %}
+{% set other_ifcs    = other_ifcs    | sort(attribute='name') %}
 
 {# Physical interfaces #}
 {%- for intf in physical_ifcs %}
@@ -170,7 +199,7 @@ interface {{ intf.name }}
 !
 {% endfor %}
 {# Port-channel interfaces #}
-{%- for intf in port_channel_ifcs %}
+{%- for intf in po_ifcs %}
 interface {{ intf.name }}
 {% if intf.description %}
  description {{ intf.description }}
@@ -281,7 +310,7 @@ interface {{ intf.name }}
 !
 {% endfor %}
 {# VLAN interfaces (SVIs) #}
-{%- for intf in vlan_ifcs %}
+{%- for intf in svi_ifcs %}
 interface {{ intf.name }}
 {% if intf.description %}
  description {{ intf.description }}
