@@ -51,16 +51,21 @@
 {% set ospf_config = host.config_context.ospf | default({}) %}
 {% set ospf_interfaces = ospf_config.interfaces | default([]) | map(attribute='name') | list %}
 
-{%- for intf in all_ifcs %}
+{# Split interfaces into physical, port-channels, and SVIs for correct order #}
+{% set physical_ifcs = all_ifcs | select('match', '^(GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE)') | list %}
+{% set port_channel_ifcs = all_ifcs | select('match', '^Port-channel') | list %}
+{% set vlan_ifcs = all_ifcs | select('match', '^Vlan') | list %}
+{% set other_ifcs = all_ifcs | reject('match', '^(GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|Port-channel|Vlan)') | list %}
+
+{# Physical interfaces #}
+{%- for intf in physical_ifcs %}
 interface {{ intf.name }}
 {% if intf.description %}
  description {{ intf.description }}
 {% elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
  description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
-{% elif intf.name.lower() == 'vlan1000' %}
- description MANAGEMENT INTERFACE
 {% endif %}
-{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL with tagged_vlans), access (untagged VLAN or ACCESS), stackwise-virtual, or none #}
+{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED), access (untagged VLAN or ACCESS or TAGGED_ALL with no tagged_vlans), stackwise-virtual, or none #}
 {% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
 {% set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
 {% set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
@@ -76,8 +81,8 @@ interface {{ intf.name }}
  ! warning: Invalid stackwise_virtual_type for {{ intf.name }}
 {% endif %}
 {% endif %}
-{# IP address for routed interfaces (including SVIs) #}
-{% if inferred_mode == 'routed' or intf.name.lower().startswith('vlan') %}
+{# IP address for routed interfaces #}
+{% if inferred_mode == 'routed' %}
  no switchport
 {% if intf.ip_addresses %}
  ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
@@ -133,8 +138,267 @@ interface {{ intf.name }}
  switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
 {% elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
-{%- elif intf.enabled | default(true) %}
- ! warning: No tagged VLANs defined for {{ intf.name }}
+{% endif %}
+ switchport nonegotiate
+{% endif %}
+{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
+{{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
+{% endif %}
+{% if intf._custom_field_data.get('portfast') %}
+ spanning-tree portfast
+{% endif %}
+{% if intf._custom_field_data.get('bpduguard') %}
+ spanning-tree bpduguard enable
+{% endif %}
+{% if intf._custom_field_data.get('dhcp_snooping_limit') %}
+ ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
+{% endif %}
+{% if intf._custom_field_data.get('dhcp_snooping_trust') %}
+ ip dhcp snooping trust
+{% endif %}
+{% if is_uplink and intf.lag and intf.lag.name %}
+ channel-group {{ intf.lag.name | replace('Port-channel', '') | lower }} mode active
+{% endif %}
+{% endif %}
+{# Interface state #}
+{% if intf.enabled | default(true) %}
+ no shutdown
+{% else %}
+ shutdown
+{% endif %}
+!
+{% endfor %}
+{# Port-channel interfaces #}
+{%- for intf in port_channel_ifcs %}
+interface {{ intf.name }}
+{% if intf.description %}
+ description {{ intf.description }}
+{% elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
+ description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
+{% endif %}
+{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED), access (untagged VLAN or ACCESS or TAGGED_ALL with no tagged_vlans), stackwise-virtual, or none #}
+{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
+{% set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
+{% set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
+{# Stackwise-Virtual configuration #}
+{% if inferred_mode == 'stackwise-virtual' %}
+{% set sv_type = intf._custom_field_data.get('stackwise_virtual_type') %}
+{% set sv_id = intf._custom_field_data.get('stackwise_virtual_id') %}
+{% if sv_type == 'link' %}
+ stackwise-virtual link {{ sv_id | default(loop.index) }}
+{% elif sv_type == 'dual-active-detection' %}
+ stackwise-virtual dual-active-detection
+{% else %}
+ ! warning: Invalid stackwise_virtual_type for {{ intf.name }}
+{% endif %}
+{% endif %}
+{# IP address for routed interfaces #}
+{% if inferred_mode == 'routed' %}
+ no switchport
+{% if intf.ip_addresses %}
+ ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
+{% else %}
+ ! warning: No IP address defined for routed interface {{ intf.name }}
+{% endif %}
+{# Management interface with VRF and DHCP #}
+{% if intf.vrf %}
+ vrf forwarding {{ intf.vrf.name }}
+{% if intf._custom_field_data.get('dhcp_client') %}
+ ip dhcp client client-id ascii {{ intf._custom_field_data.get('client_id') }}
+ ip dhcp client hostname {{ intf._custom_field_data.get('hostname') }}
+ ip address dhcp
+ negotiation auto
+{% endif %}
+{% endif %}
+{{ render_ospf(intf, ospf_config) | indent(1) }}
+{% endif %}
+{# Switchport configuration #}
+{% if is_switchport %}
+{% if inferred_mode == 'access' %}
+ switchport mode access
+{% if intf._custom_field_data.get('vlan_type') in ['data', 'video', 'security'] and intf._custom_field_data.get(intf._custom_field_data.vlan_type + '_vlan') %}
+ switchport access vlan {{ intf._custom_field_data[intf._custom_field_data.vlan_type + '_vlan'] }}
+{% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+ switchport access vlan {{ intf.untagged_vlan.vid }}
+{% else %}
+ ! warning: No access VLAN defined for {{ intf.name }}
+{% endif %}
+{% if intf._custom_field_data.get('cf_voice_vlan') %}
+ switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
+{% elif intf._custom_field_data.get('voice_vlan') %}
+ switchport voice vlan {{ intf._custom_field_data.get('voice_vlan') }}
+{% endif %}
+{% endif %}
+{% if inferred_mode == 'trunk' %}
+ switchport mode trunk
+{% if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
+ switchport trunk native vlan 1000
+{% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+ switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+{% elif is_uplink %}
+ switchport trunk native vlan 1000
+{% else %}
+ ! warning: No native VLAN defined for {{ intf.name }}
+{% endif %}
+{% set vlan_list = [] %}
+{% if intf._custom_field_data.get('data_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('data_vlan')) %}{% endif %}
+{% if intf._custom_field_data.get('voice_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('voice_vlan')) %}{% endif %}
+{% if intf._custom_field_data.get('video_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('video_vlan')) %}{% endif %}
+{% if intf._custom_field_data.get('security_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('security_vlan')) %}{% endif %}
+{% if vlan_list %}
+ switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
+{% elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
+ switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
+{% endif %}
+ switchport nonegotiate
+{% endif %}
+{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
+{{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
+{% endif %}
+{% if intf._custom_field_data.get('portfast') %}
+ spanning-tree portfast
+{% endif %}
+{% if intf._custom_field_data.get('bpduguard') %}
+ spanning-tree bpduguard enable
+{% endif %}
+{% if intf._custom_field_data.get('dhcp_snooping_limit') %}
+ ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
+{% endif %}
+{% if intf._custom_field_data.get('dhcp_snooping_trust') %}
+ ip dhcp snooping trust
+{% endif %}
+{% if is_uplink and intf.lag and intf.lag.name %}
+ channel-group {{ intf.lag.name | replace('Port-channel', '') | lower }} mode active
+{% endif %}
+{% endif %}
+{# Interface state #}
+{% if intf.enabled | default(true) %}
+ no shutdown
+{% else %}
+ shutdown
+{% endif %}
+!
+{% endfor %}
+{# VLAN interfaces (SVIs) #}
+{%- for intf in vlan_ifcs %}
+interface {{ intf.name }}
+{% if intf.description %}
+ description {{ intf.description }}
+{% elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
+ description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
+{% elif intf.name.lower() == 'vlan1000' %}
+ description MANAGEMENT INTERFACE
+{% endif %}
+{# VLAN interfaces are always routed #}
+{% set inferred_mode = 'routed' %}
+{% set is_switchport = false %}
+{% set is_uplink = false %}
+ no switchport
+{% if intf.ip_addresses %}
+ ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
+{% else %}
+ ! warning: No IP address defined for routed interface {{ intf.name }}
+{% endif %}
+{# Management interface with VRF and DHCP #}
+{% if intf.vrf %}
+ vrf forwarding {{ intf.vrf.name }}
+{% if intf._custom_field_data.get('dhcp_client') %}
+ ip dhcp client client-id ascii {{ intf._custom_field_data.get('client_id') }}
+ ip dhcp client hostname {{ intf._custom_field_data.get('hostname') }}
+ ip address dhcp
+ negotiation auto
+{% endif %}
+{% endif %}
+{{ render_ospf(intf, ospf_config) | indent(1) }}
+{# Interface state #}
+{% if intf.enabled | default(true) %}
+ no shutdown
+{% else %}
+ shutdown
+{% endif %}
+!
+{% endfor %}
+{# Other interfaces (e.g., Loopback0) #}
+{%- for intf in other_ifcs %}
+interface {{ intf.name }}
+{% if intf.description %}
+ description {{ intf.description }}
+{% elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
+ description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
+{% endif %}
+{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED), access (untagged VLAN or ACCESS or TAGGED_ALL with no tagged_vlans), stackwise-virtual, or none #}
+{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
+{% set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
+{% set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
+{# Stackwise-Virtual configuration #}
+{% if inferred_mode == 'stackwise-virtual' %}
+{% set sv_type = intf._custom_field_data.get('stackwise_virtual_type') %}
+{% set sv_id = intf._custom_field_data.get('stackwise_virtual_id') %}
+{% if sv_type == 'link' %}
+ stackwise-virtual link {{ sv_id | default(loop.index) }}
+{% elif sv_type == 'dual-active-detection' %}
+ stackwise-virtual dual-active-detection
+{% else %}
+ ! warning: Invalid stackwise_virtual_type for {{ intf.name }}
+{% endif %}
+{% endif %}
+{# IP address for routed interfaces #}
+{% if inferred_mode == 'routed' %}
+ no switchport
+{% if intf.ip_addresses %}
+ ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
+{% else %}
+ ! warning: No IP address defined for routed interface {{ intf.name }}
+{% endif %}
+{# Management interface with VRF and DHCP #}
+{% if intf.vrf %}
+ vrf forwarding {{ intf.vrf.name }}
+{% if intf._custom_field_data.get('dhcp_client') %}
+ ip dhcp client client-id ascii {{ intf._custom_field_data.get('client_id') }}
+ ip dhcp client hostname {{ intf._custom_field_data.get('hostname') }}
+ ip address dhcp
+ negotiation auto
+{% endif %}
+{% endif %}
+{{ render_ospf(intf, ospf_config) | indent(1) }}
+{% endif %}
+{# Switchport configuration #}
+{% if is_switchport %}
+{% if inferred_mode == 'access' %}
+ switchport mode access
+{% if intf._custom_field_data.get('vlan_type') in ['data', 'video', 'security'] and intf._custom_field_data.get(intf._custom_field_data.vlan_type + '_vlan') %}
+ switchport access vlan {{ intf._custom_field_data[intf._custom_field_data.vlan_type + '_vlan'] }}
+{% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+ switchport access vlan {{ intf.untagged_vlan.vid }}
+{% else %}
+ ! warning: No access VLAN defined for {{ intf.name }}
+{% endif %}
+{% if intf._custom_field_data.get('cf_voice_vlan') %}
+ switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
+{% elif intf._custom_field_data.get('voice_vlan') %}
+ switchport voice vlan {{ intf._custom_field_data.get('voice_vlan') }}
+{% endif %}
+{% endif %}
+{% if inferred_mode == 'trunk' %}
+ switchport mode trunk
+{% if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
+ switchport trunk native vlan 1000
+{% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+ switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+{% elif is_uplink %}
+ switchport trunk native vlan 1000
+{% else %}
+ ! warning: No native VLAN defined for {{ intf.name }}
+{% endif %}
+{% set vlan_list = [] %}
+{% if intf._custom_field_data.get('data_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('data_vlan')) %}{% endif %}
+{% if intf._custom_field_data.get('voice_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('voice_vlan')) %}{% endif %}
+{% if intf._custom_field_data.get('video_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('video_vlan')) %}{% endif %}
+{% if intf._custom_field_data.get('security_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('security_vlan')) %}{% endif %}
+{% if vlan_list %}
+ switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
+{% elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
+ switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
 {% endif %}
  switchport nonegotiate
 {% endif %}
