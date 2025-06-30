@@ -42,6 +42,9 @@
 {% endif %}
 {%- endmacro %}
 
+{# Import regex for filtering physical interfaces #}
+{% import 're' %}
+
 {# Aggregate all interfaces, including module interfaces if present #}
 {% set device_ifcs = host.interfaces | default([]) %}
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
@@ -51,11 +54,11 @@
 {% set ospf_config = host.config_context.ospf | default({}) %}
 {% set ospf_interfaces = ospf_config.interfaces | default([]) | map(attribute='name') | list %}
 
-{# Split interfaces into physical, port-channels, and SVIs for correct order #}
-{% set physical_ifcs = all_ifcs | select('match', '^(GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE)') | list %}
-{% set port_channel_ifcs = all_ifcs | select('match', '^Port-channel') | list %}
-{% set vlan_ifcs = all_ifcs | select('match', '^Vlan') | list %}
-{% set other_ifcs = all_ifcs | reject('match', '^(GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|Port-channel|Vlan)') | list %}
+{# Split interfaces into physical, port-channels, SVIs, and others for correct order #}
+{% set physical_ifcs = [intf for intf in all_ifcs if re.match('^(GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|TweLine Card)', intf.name)] %}
+{% set port_channel_ifcs = [intf for intf in all_ifcs if intf.name.lower().startswith('port-channel')] %}
+{% set vlan_ifcs = [intf for intf in all_ifcs if intf.name.lower().startswith('vlan')] %}
+{% set other_ifcs = [intf for intf in all_ifcs if not (re.match('^(GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|TweLine Card)', intf.name) or intf.name.lower().startswith('port-channel') or intf.name.lower().startswith('vlan'))] %}
 
 {# Physical interfaces #}
 {%- for intf in physical_ifcs %}
@@ -253,8 +256,7 @@ interface {{ intf.name }}
  switchport nonegotiate
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
-{{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
-{% endif %}
+{{ render_oth
 {% if intf._custom_field_data.get('portfast') %}
  spanning-tree portfast
 {% endif %}
