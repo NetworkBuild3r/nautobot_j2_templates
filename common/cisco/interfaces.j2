@@ -40,8 +40,8 @@ interface {{ intf.name }}
 {%- set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else none %}
 {%- set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
 {%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) -%}
- {# IP address for routed interfaces #}
-{%- if inferred_mode == 'routed' %}
+{# IP address for routed interfaces #}
+{% if inferred_mode == 'routed' %}
  no switchport
  ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
 {%- endif %}
@@ -81,16 +81,17 @@ interface {{ intf.name }}
 ! warning: No tagged VLANs defined for {{ intf.name }}
 {% endif %}
  switchport nonegotiate
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink %}
+
 {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('portfast') %}
  spanning-tree portfast
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('bpduguard') %}
  spanning-tree bpduguard enable
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('dhcp_snooping_limit') %}
  ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
 {%- endif %}
