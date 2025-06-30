@@ -19,6 +19,31 @@
 {% endif %}
 {%- endmacro %}
 
+{%- macro render_ospf(intf, ospf_config) %}
+{% if intf._custom_field_data.get('ospf_enabled') %}
+{% if intf.ip_addresses or intf.name.lower().startswith('vlan') %}
+ ip ospf {{ ospf_config.process_id | default(1) }} area {{ intf._custom_field_data.get('ospf_area', ospf_config.area | default('0.0.0.0')) }}
+{% if intf._custom_field_data.get('apply_helper') and intf.name.lower() != 'vlan1000' %}
+{% if ospf_config.helper_addresses %}
+{% for helper in ospf_config.helper_addresses %}
+ ip helper-address {{ helper }}
+{% endfor %}
+{% else %}
+ ! warning: Missing helper_addresses in ospf_config for {{ intf.name }}
+{% endif %}
+{% endif %}
+{% if intf._custom_field_data.get('ospf_md5_key') %}
+ ip ospf message-digest-key {{ intf._custom_field_data.get('ospf_md5_key') }} md5 7 {{ ospf_config.md5_secret | default('ospf_digest') }}
+{% else %}
+ ! warning: Missing ospf_md5_key for interface {{ intf.name }}
+{% endif %}
+ ip ospf network {{ intf._custom_field_data.get('ospf_network_type', 'broadcast') }}
+{% else %}
+ ! warning: Interface {{ intf.name }} in OSPF config but has no IP address
+{% endif %}
+{% endif %}
+{%- endmacro %}
+
 {# Aggregate all interfaces, including module interfaces if present #}
 {% set device_ifcs = host.interfaces | default([]) %}
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
@@ -35,14 +60,41 @@ interface {{ intf.name }}
 {% elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
  description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
 {% endif %}
-{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL), access (untagged VLAN or ACCESS), or none #}
-{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else none %}
+{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL), access (untagged VLAN or ACCESS), stackwise-virtual, or none #}
+{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
 {% set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
 {% set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
-{# IP address for routed interfaces #}
-{% if inferred_mode == 'routed' %}
+{# Stackwise-Virtual configuration #}
+{% if inferred_mode == 'stackwise-virtual' %}
+{% set sv_type = intf._custom_field_data.get('stackwise_virtual_type') %}
+{% set sv_id = intf._custom_field_data.get('stackwise_virtual_id') %}
+{% if sv_type == 'link' %}
+ stackwise-virtual link {{ sv_id | default(loop.index) }}
+{% elif sv_type == 'dual-active-detection' %}
+ stackwise-virtual dual-active-detection
+{% else %}
+ ! warning: Invalid stackwise_virtual_type for {{ intf.name }}
+{% endif %}
+{% endif %}
+{# IP address for routed interfaces (including SVIs) #}
+{% if inferred_mode == 'routed' or intf.name.lower().startswith('vlan') %}
  no switchport
+{% if intf.ip_addresses %}
  ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
+{% else %}
+ ! warning: No IP address defined for routed interface {{ intf.name }}
+{% endif %}
+{# Management interface with VRF and DHCP #}
+{% if intf.vrf %}
+ vrf forwarding {{ intf.vrf.name }}
+{% if intf._custom_field_data.get('dhcp_client') %}
+ ip dhcp client client-id ascii {{ intf._custom_field_data.get('client_id') }}
+ ip dhcp client hostname {{ intf._custom_field_data.get('hostname') }}
+ ip address dhcp
+ negotiation auto
+{% endif %}
+{% endif %}
+{{ render_ospf(intf, ospf_config) | indent(1) }}
 {% endif %}
 {# Switchport configuration #}
 {% if is_switchport %}
@@ -52,6 +104,8 @@ interface {{ intf.name }}
  switchport access vlan {{ intf._custom_field_data[intf._custom_field_data.vlan_type + '_vlan'] }}
 {% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport access vlan {{ intf.untagged_vlan.vid }}
+{% else %}
+ ! warning: No access VLAN defined for {{ intf.name }}
 {% endif %}
 {% if intf._custom_field_data.get('cf_voice_vlan') %}
  switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
@@ -65,6 +119,8 @@ interface {{ intf.name }}
  switchport trunk native vlan 1000
 {% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+{% else %}
+ ! warning: No native VLAN defined for {{ intf.name }}
 {% endif %}
 {% set vlan_list = [] %}
 {% if intf._custom_field_data.get('data_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('data_vlan')) %}{% endif %}
@@ -76,11 +132,10 @@ interface {{ intf.name }}
 {% elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
 {%- else %}
-! warning: No tagged VLANs defined for {{ intf.name }}
+ ! warning: No tagged VLANs defined for {{ intf.name }}
 {% endif %}
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink %}
-
 {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
 {% endif %}
 {% if intf._custom_field_data.get('portfast') %}
@@ -97,35 +152,6 @@ interface {{ intf.name }}
 {% endif %}
 {% if is_uplink and intf.lag and intf.lag.name %}
  channel-group {{ intf.lag.name | replace('Port-channel', '') | lower }} mode active
-{% endif %}
-{% endif %}
-{# OSPF configuration for interfaces #}
-{% if intf.name in ospf_interfaces %}
-{% set ospf_intf = ospf_config.interfaces | selectattr('name', 'equalto', intf.name) | first %}
-{% if intf.ip_addresses %}
- ip ospf {{ host.config_context.ospf_group.process_id | default(1) }} area {{ ospf_config.area | default('0.0.0.0') }}
-{% if ospf_intf.apply_helper | default(false) and intf.name.lower() != 'vlan1000' %}
-{% if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
-{% for helper in host.config_context.ospf_group.helper_addresses %}
- ip helper-address {{ helper }}
-{% endfor %}
-{% else %}
-! warning: Missing helper_addresses in ospf_group for {{ intf.name }}
-{% endif %}
-{% endif %}
-{% if ospf_intf.md5_key %}
- ip ospf message-digest-key {{ ospf_intf.md5_key }} md5 7 {{ host.config_context.ospf_group.md5_secret | default('ospf_digest') }}
-{% else %}
-! warning: Missing md5_key for interface {{ intf.name }}
-{% endif %}
-{% if ospf_intf.network_type %}
- ip ospf network {{ ospf_intf.network_type }}
-{% else %}
- ip ospf network {{ 'point-to-point' if intf.name.lower().startswith('loopback') or intf.name.lower().startswith('port-channel') else 'broadcast' }}
-! warning: Missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.name.lower().startswith('loopback') or intf.name.lower().startswith('port-channel') else 'broadcast' }}
-{% endif %}
-{% else %}
-! warning: Interface {{ intf.name }} in OSPF config but has no IP address
 {% endif %}
 {% endif %}
 {# Interface state #}
