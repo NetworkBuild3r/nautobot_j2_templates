@@ -1,5 +1,5 @@
-! OSPF process configuration for {{ host.hostname|default('unknown device') }}
-!
+{# OSPF process configuration for {{ host.hostname|default('unknown device') }}#}
+
 {% set ospf_interfaces = host.config_context.ospf.interfaces|default([])|map(attribute='name')|list %}
 {% set device_interfaces = host.interfaces|map(attribute='name')|list %}
 {% if host.config_context.ospf and host.config_context.ospf.interfaces %}

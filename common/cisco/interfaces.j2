@@ -28,7 +28,7 @@
 {% set ospf_config = host.config_context.ospf | default({}) %}
 {% set ospf_interfaces = ospf_config.interfaces | default([]) | map(attribute='name') | list %}
 
-{% for intf in all_ifcs %}
+{%- for intf in all_ifcs %}
 interface {{ intf.name }}
 {% if intf.description %}
  description {{ intf.description }}
