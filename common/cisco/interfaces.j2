@@ -19,117 +19,126 @@
  {%- endif %}
 {%- endmacro %}
 
-{# Banner Configuration #}
-{{ host.config_context.data.banner_login | default('') }}
-!
+{# Aggregate all interfaces, including module interfaces if present #}
+{% set device_ifcs = host.interfaces | default([]) %}
+{% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
+{% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') | sort(attribute='name') | list %}
+! Found {{ all_ifcs | length }} interfaces for device {{ host.hostname | default('unknown') }}
 
-{# DNS Configuration #}
-{%- for dns in host.config_context.dns | default([]) %}
-{{ dns }}
-{%- endfor %}
-!
+{# OSPF configuration data #}
+{% set ospf_config = host.config_context.ospf | default({}) %}
+{% set ospf_interfaces = ospf_config.interfaces | default([]) | map(attribute='name') | list %}
 
-{# NTP Configuration #}
-{%- if host.config_context.ntp.servers %}
-{%- for server in host.config_context.ntp.servers %}
-ntp server {{ server }}
-{%- endfor %}
-!
-{%- endif %}
-
-{# SNMP Configuration #}
-{%- if host.config_context.cisco_snmp_ios.snmp %}
-snmp-server contact {{ host.config_context.cisco_snmp_ios.snmp.contact | default('Unknown') }}
-{%- if host.config_context.cisco_snmp_ios.snmp.use_device_location %}
-snmp-server location {{ host.location.name | default('Unknown') }}
-{%- endif %}
-{%- for community in host.config_context.cisco_snmp_ios.snmp.communities %}
-snmp-server community {{ community.name }} {{ community.permission }}
-{%- endfor %}
-{%- for host in host.config_context.cisco_snmp_ios.snmp.hosts %}
-snmp-server host {{ host.ip }} {{ host.secret_group }}
-{%- endfor %}
-{%- for trap in host.config_context.cisco_snmp_ios.snmp.enable_traps %}
-snmp-server enable traps {{ trap }}
-{%- endfor %}
-snmp-server source-interface traps {{ host.config_context.cisco_snmp_ios.snmp.trap_source | default('Vlan1000') }}
-!
-{%- endif %}
-
-{# AAA Configuration #}
-{%- if host.config_context.aaa %}
-aaa new-model
-{%- if host.config_context.aaa.misc %}
-aaa session-id {{ host.config_context.aaa.misc.session_id | default('common') }}
-{%- endfor %}
-{%- for server in host.config_context.aaa.tacacs_servers %}
-tacacs server {{ server.name }}
- address ipv4 {{ server.ip_address }}
- key 7 {{ server.secret_group }}
-{%- endfor %}
-{%- if host.config_context.aaa.authentication %}
-aaa authentication login default {{ host.config_context.aaa.authentication.login.default | default('local') }}
-aaa authentication login vty {{ host.config_context.aaa.authentication.login.vty | default('local') }}
-aaa authentication login console {{ host.config_context.aaa.authentication.login.console | default('enable') }}
-aaa authentication enable default {{ host.config_context.aaa.authentication.enable | default('enable') }}
-{%- endif %}
-{%- if host.config_context.aaa.authorization %}
-aaa authorization exec default {{ host.config_context.aaa.authorization.exec | default('local') }}
-aaa authorization commands 0 default {{ host.config_context.aaa.authorization.commands['0'] | default('local') }}
-aaa authorization commands 15 default {{ host.config_context.aaa.authorization.commands['15'] | default('local') }}
-aaa authorization config-commands {{ host.config_context.aaa.authorization.config_commands | default('local') }}
-{%- endif %}
-{%- if host.config_context.aaa.accounting %}
-aaa accounting exec default {{ host.config_context.aaa.accounting.exec | default('none') }}
-aaa accounting commands 0 default {{ host.config_context.aaa.accounting.commands['0'] | default('none') }}
-aaa accounting commands 15 default {{ host.config_context.aaa.accounting.commands['15'] | default('none') }}
-{%- endif %}
-!
-{%- endif %}
-
-{# Line Configurations #}
-{%- if host.config_context.line_configs %}
-line vty 0 4
- {{ host.config_context.line_configs.vty | default('') | indent(1) }}
-!
-line console 0
- {{ host.config_context.line_configs.console | default('') | indent(1) }}
-!
-{%- endif %}
-
-{# STP Configuration #}
-{%- if host.config_context.stp %}
-spanning-tree mode {{ host.config_context.stp.mode | default('rapid-pvst') }}
-spanning-tree vlan 1-4094 priority {{ host.config_context.stp.priority | default(61440) }}
-!
-{%- endif %}
-
-{# Global OSPF Configuration #}
-{%- if host.config_context.ospf or host.config_context.ospf_group %}
-router ospf {{ host.config_context.ospf_group.process_id | default(1) }}
- router-id {{ host.config_context.ospf.loopback_ip | default('0.0.0.0') }}
- {%- if host.config_context.ospf_group.global_settings.ignore_lsa_mospf %}
- ignore lsa mospf
+{% for intf in all_ifcs %}
+interface {{ intf.name }}
+ {%- if intf.description %}
+ description {{ intf.description }}
+ {%- elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
+ description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
  {%- endif %}
- {%- if host.config_context.ospf_group.global_settings.log_adjacency_changes %}
- log-adjacency-changes {{ host.config_context.ospf_group.global_settings.log_adjacency_changes }}
- {%- endif %}
- {%- if host.config_context.ospf.area %}
- area {{ host.config_context.ospf.area }} authentication message-digest
- area {{ host.config_context.ospf.area }} {{ host.config_context.ospf_group.area_type | default('stub') }} {{ host.config_context.ospf_group.area_options | default([]) | join(' ') }}
- network {{ host.config_context.ospf.loopback_ip | default('0.0.0.0') }} 0.0.0.0 area {{ host.config_context.ospf.area }}
- {%- endif %}
-!
-{%- endif %}
 
-{# VLAN Interface Configuration #}
-{%- if host.config_context.site_pedc.vlan1000 %}
-interface Vlan1000
- ip address {{ host.config_context.site_pedc.vlan1000.ip_address }} {{ host.config_context.site_pedc.vlan1000.subnet_mask }}
+ {# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL), access (untagged VLAN or ACCESS), or none #}
+ {%- set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else null %}
+ {%- set is_switchport = inferred_mode in ['access', 'trunk'] %}
+ {%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
+
+ {# IP address for routed interfaces #}
+ {%- if inferred_mode == 'routed' %}
+ no switchport
+ ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
+ {%- endif %}
+
+ {# Switchport configuration #}
+ {%- if is_switchport %}
+  {%- if inferred_mode == 'access' %}
+ switchport mode access
+   {%- if intf._custom_field_data.get('vlan_type') in ['data', 'video', 'security'] and intf._custom_field_data.get(intf._custom_field_data.vlan_type + '_vlan') %}
+ switchport access vlan {{ intf._custom_field_data[intf._custom_field_data.vlan_type + '_vlan'] }}
+   {%- elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+ switchport access vlan {{ intf.untagged_vlan.vid }}
+   {%- endif %}
+   {%- if intf._custom_field_data.get('cf_voice_vlan') %}
+ switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
+   {%- elif intf._custom_field_data.get('voice_vlan') %}
+ switchport voice vlan {{ intf._custom_field_data.get('voice_vlan') }}
+   {%- endif %}
+  {%- endif %}
+  {%- if inferred_mode == 'trunk' %}
+ switchport mode trunk
+   {%- if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
+ switchport trunk native vlan 1000
+   {%- elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+ switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+   {%- endif %}
+   {%- set vlan_list = [] %}
+   {%- if intf._custom_field_data.get('data_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('data_vlan')) %}{% endif %}
+   {%- if intf._custom_field_data.get('voice_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('voice_vlan')) %}{% endif %}
+   {%- if intf._custom_field_data.get('video_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('video_vlan')) %}{% endif %}
+   {%- if intf._custom_field_data.get('security_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('security_vlan')) %}{% endif %}
+   {%- if vlan_list %}
+ switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
+   {%- elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
+ switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
+   {%- else %}
+    ! warning: No tagged VLANs defined for {{ intf.name }}
+   {%- endif %}
+ switchport nonegotiate
+  {%- endif %}
+  {%- if intf._custom_field_data.get('storm_control_level') not in [null, ''] or is_uplink %}
+ {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
+  {%- endif %}
+  {%- if intf._custom_field_data.get('portfast') %}
+ spanning-tree portfast
+  {%- endif %}
+  {%- if intf._custom_field_data.get('bpduguard') %}
+ spanning-tree bpduguard enable
+  {%- endif %}
+  {%- if intf._custom_field_data.get('dhcp_snooping_limit') %}
+ ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
+  {%- endif %}
+  {%- if intf._custom_field_data.get('dhcp_snooping_trust') %}
+ ip dhcp snooping trust
+  {%- endif %}
+  {%- if is_uplink and intf.lag and intf.lag.name %}
+ channel-group {{ intf.lag.name | replace('Port-channel', '') | lower }} mode active
+  {%- endif %}
+ {%- endif %}
+
+ {# OSPF configuration for interfaces #}
+ {%- if intf.name in ospf_interfaces %}
+  {%- set ospf_intf = ospf_config.interfaces | selectattr('name', 'equalto', intf.name) | first %}
+  {%- if intf.ip_addresses %}
+ ip ospf {{ host.config_context.ospf_group.process_id | default(1) }} area {{ ospf_config.area | default('0.0.0.0') }}
+   {%- if ospf_intf.apply_helper | default(false) and intf.name.lower() != 'vlan1000' %}
+    {%- if host.config_context.ospf_group and host.config_context.ospf_group.helper_addresses %}
+     {%- for helper in host.config_context.ospf_group.helper_addresses %}
+ ip helper-address {{ helper }}
+     {%- endfor %}
+    {%- else %}
+    ! warning: Missing helper_addresses in ospf_group for {{ intf.name }}
+    {%- endif %}
+   {%- endif %}
+   {%- if ospf_intf.md5_key %}
+ ip ospf message-digest-key {{ ospf_intf.md5_key }} md5 7 {{ host.config_context.ospf_group.md5_secret | default('ospf_digest') }}
+   {%- else %}
+    ! warning: Missing md5_key for interface {{ intf.name }}
+   {%- endif %}
+   {%- if ospf_intf.network_type %}
+ ip ospf network {{ ospf_intf.network_type }}
+   {%- else %}
+ ip ospf network {{ 'point-to-point' if intf.name.lower().startswith('loopback') or intf.name.lower().startswith('port-channel') else 'broadcast' }}
+    ! warning: Missing network_type for {{ intf.name }}, defaulting to {{ 'point-to-point' if intf.name.lower().startswith('loopback') or intf.name.lower().startswith('port-channel') else 'broadcast' }}
+   {%- endif %}
+  {%- else %}
+   ! warning: Interface {{ intf.name }} in OSPF config but has no IP address
+  {%- endif %}
+ {%- endif %}
+
+ {# Interface state #}
+ {%- if intf.enabled | default(true) %}
  no shutdown
+ {%- else %}
+ shutdown
+ {%- endif %}
 !
-{%- endif %}
-
-{# Interface Configurations #}
-{% include 'common/cisco/interfaces.j2' %}
-!
+{% endfor %}
