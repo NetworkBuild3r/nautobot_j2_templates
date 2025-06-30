@@ -64,18 +64,15 @@
 
 {# --- 1. Put each interface in the right bucket -------------------- #}
 {% for intf in all_ifcs %}
-  {% if   intf.name.startswith(
+  {% if intf.name.startswith(
          ('GigabitEthernet', 'TenGigabitEthernet',
           'TwentyFiveGigE',  'FortyGigabitEthernet',
           'HundredGigE',     'TweLine Card')) %}
         {% set _ = physical_ifcs.append(intf) %}
-
-  {% elif intf.name|lower startswith 'port-channel' %}
+  {% elif intf.name|lower|startswith('port-channel') %}
         {% set _ = po_ifcs.append(intf) %}
-
-  {% elif intf.name|lower startswith 'vlan' %}
+  {% elif intf.name|lower|startswith('vlan') %}
         {% set _ = svi_ifcs.append(intf) %}
-
   {% else %}
         {% set _ = other_ifcs.append(intf) %}
   {% endif %}
@@ -83,9 +80,9 @@
 
 {# --- 2. Natural-sort each bucket ---------------------------------- #}
 {% set physical_ifcs = sort_interface_list(physical_ifcs, attr='name') %}
-{% set po_ifcs       = po_ifcs       | sort(attribute='name') %}
-{% set svi_ifcs      = svi_ifcs      | sort(attribute='name') %}
-{% set other_ifcs    = other_ifcs    | sort(attribute='name') %}
+{% set po_ifcs       = po_ifcs | sort(attribute='name') %}
+{% set svi_ifcs      = svi_ifcs | sort(attribute='name') %}
+{% set other_ifcs    = other_ifcs | sort(attribute='name') %}
 
 {# Physical interfaces #}
 {%- for intf in physical_ifcs %}
