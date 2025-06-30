@@ -28,9 +28,9 @@
 {% if host.config_context.ospf %}
 {% include 'common/cisco/ospf.j2' %}
 {% endif %}
-!
+
 {% if host.interfaces is defined and host.interfaces | length > 0 %}
-{% with interfaces = host.interfaces %}
+{%- with interfaces = host.interfaces %}
 {% include 'common/cisco/interfaces.j2' %}
 {% endwith %}
 {% else %}
