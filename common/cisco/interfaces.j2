@@ -82,7 +82,7 @@ interface {{ intf.name }}
 {% endif %}
  switchport nonegotiate
 {%- endif %}
-{%- if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink %}
+{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink %}
 {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
 {%- endif %}
 {% if intf._custom_field_data.get('portfast') %}
