@@ -42,23 +42,21 @@
 {% endif %}
 {%- endmacro %}
 
-{# Import regex for filtering physical interfaces #}
-{% import 're' %}
-
 {# Aggregate all interfaces, including module interfaces if present #}
 {% set device_ifcs = host.interfaces | default([]) %}
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
 {% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') | sort(attribute='name') | list %}
 
-{# OSPF configuration data #}
-{% set ospf_config = host.config_context.ospf | default({}) %}
-{% set ospf_interfaces = ospf_config.interfaces | default([]) | map(attribute='name') | list %}
-
 {# Split interfaces into physical, port-channels, SVIs, and others for correct order #}
-{% set physical_ifcs = [intf for intf in all_ifcs if re.match('^(GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|TweLine Card)', intf.name)] %}
+{% set physical_ifcs = [] %}
+{% for intf in all_ifcs %}
+{% if intf.name.startswith('GigabitEthernet') or intf.name.startswith('TenGigabitEthernet') or intf.name.startswith('TwentyFiveGigE') or intf.name.startswith('FortyGigabitEthernet') or intf.name.startswith('HundredGigE') or intf.name.startswith('TweLine Card') %}
+{% set _ = physical_ifcs.append(intf) %}
+{% endif %}
+{% endfor %}
 {% set port_channel_ifcs = [intf for intf in all_ifcs if intf.name.lower().startswith('port-channel')] %}
 {% set vlan_ifcs = [intf for intf in all_ifcs if intf.name.lower().startswith('vlan')] %}
-{% set other_ifcs = [intf for intf in all_ifcs if not (re.match('^(GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|TweLine Card)', intf.name) or intf.name.lower().startswith('port-channel') or intf.name.lower().startswith('vlan'))] %}
+{% set other_ifcs = [intf for intf in all_ifcs if not (intf.name.startswith('GigabitEthernet') or intf.name.startswith('TenGigabitEthernet') or intf.name.startswith('TwentyFiveGigE') or intf.name.startswith('FortyGigabitEthernet') or intf.name.startswith('HundredGigE') or intf.name.startswith('TweLine Card') or intf.name.lower().startswith('port-channel') or intf.name.lower().startswith('vlan'))] %}
 
 {# Physical interfaces #}
 {%- for intf in physical_ifcs %}
@@ -256,7 +254,8 @@ interface {{ intf.name }}
  switchport nonegotiate
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
-{{ render_oth
+{{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
+{% endif %}
 {% if intf._custom_field_data.get('portfast') %}
  spanning-tree portfast
 {% endif %}
