@@ -1,7 +1,7 @@
 {%- macro render_storm_control(intf, is_uplink=False) %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
   storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
-{% elif is_uplink %}
+{%- elif is_uplink %}
   storm-control broadcast level bps 20m
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
@@ -129,7 +129,6 @@ interface {{ intf.name }}
 ! warning: Interface {{ intf.name }} in OSPF config but has no IP address
 {% endif %}
 {% endif %}
-
 {# Interface state #}
 {% if intf.enabled | default(true) %}
  no shutdown
