@@ -1,10 +1,6 @@
 {%- macro render_storm_control(intf, is_uplink=False) %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
-{%- elif is_uplink %}
- storm-control broadcast level bps 20m
-{%- elif intf.mode == 'ACCESS' %}
- storm-control broadcast level 40.00
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {% set action_val = intf._custom_field_data.get('storm_control_action') %}
@@ -142,7 +138,7 @@ interface {{ intf.name }}
 {% endif %}
  switchport nonegotiate
 {% endif %}
-{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink or intf.mode == 'ACCESS' %}
+{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
 {% endif %}
 {% if intf._custom_field_data.get('portfast') %}
