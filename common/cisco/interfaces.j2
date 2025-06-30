@@ -78,6 +78,7 @@ interface {{ intf.name }}
 {%- else %}
 ! warning: No tagged VLANs defined for {{ intf.name }}
 {% endif %}
+{% endif %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or is_uplink %}
 {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
 {% endif %}
