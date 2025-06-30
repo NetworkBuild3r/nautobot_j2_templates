@@ -123,6 +123,8 @@ interface {{ intf.name }}
  switchport trunk native vlan 1000
 {% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
+{% elif is_uplink %}
+ switchport trunk native vlan 1000
 {% else %}
  ! warning: No native VLAN defined for {{ intf.name }}
 {% endif %}
@@ -135,7 +137,7 @@ interface {{ intf.name }}
  switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
 {% elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
-{%- else %}
+{%- elif intf.enabled | default(true) %}
  ! warning: No tagged VLANs defined for {{ intf.name }}
 {% endif %}
  switchport nonegotiate
