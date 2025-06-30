@@ -39,9 +39,9 @@ interface {{ intf.name }}
  {# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED/TAGGED_ALL), access (untagged VLAN or ACCESS), or none #}
 {%- set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans or intf.mode in ['TAGGED', 'TAGGED_ALL']) else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS') else none %}
 {%- set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
-{%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
+{%- set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) -%}
  {# IP address for routed interfaces #}
-{%- if inferred_mode == 'routed' -%}
+{%- if inferred_mode == 'routed' %}
  no switchport
  ip address {{ intf.ip_addresses[0].address | replace('/', ' ') }}
 {%- endif %}
@@ -134,8 +134,8 @@ interface {{ intf.name }}
  {# Interface state #}
 {%- if intf.enabled | default(true) %}
  no shutdown
-{%- else -%}
+{% else %}
  shutdown
- {% endif %}
+{% endif %}
 !
 {% endfor %}
