@@ -1,8 +1,8 @@
 {%- macro render_storm_control(intf, is_uplink=False) %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
-  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
+ storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
 {%- elif is_uplink %}
-  storm-control broadcast level bps 20m
+ storm-control broadcast level bps 20m
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {% set action_val = intf._custom_field_data.get('storm_control_action') %}
@@ -14,7 +14,7 @@
 {% set action = none %}
 {% endif %}
 {% if action and action != 'drop' %}
-  storm-control action {{ action }}
+ storm-control action {{ action }}
 {% endif %}
 {% endif %}
 {%- endmacro %}
@@ -23,7 +23,6 @@
 {% set device_ifcs = host.interfaces | default([]) %}
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
 {% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') | sort(attribute='name') | list %}
-! Found {{ all_ifcs | length }} interfaces for device {{ host.hostname | default('unknown') }}
 
 {# OSPF configuration data #}
 {% set ospf_config = host.config_context.ospf | default({}) %}
@@ -76,7 +75,7 @@ interface {{ intf.name }}
  switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
 {% elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
-{% else %}
+{%- else %}
 ! warning: No tagged VLANs defined for {{ intf.name }}
 {% endif %}
  switchport nonegotiate
