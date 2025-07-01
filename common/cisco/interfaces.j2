@@ -50,10 +50,12 @@
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
 {% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') %}
 
-{# Filter valid interfaces (alphanumeric, slashes, hyphens only, no spaces) #}
-{% set valid_ifcs = all_ifcs | selectattr('name', 'match', '^[a-zA-Z0-9\/\-]+$') %}
+{# Filter valid interfaces (no spaces or special characters) #}
+{% set valid_ifcs = [] %}
 {% for ifc in all_ifcs %}
-{% if ifc.name not in (valid_ifcs | map(attribute='name') | list) %}
+{% if ' ' not in ifc.name %}
+{% set _ = valid_ifcs.append(ifc) %}
+{% else %}
  ! warning: Skipping invalid interface name: {{ ifc.name }}
 {% endif %}
 {% endfor %}
