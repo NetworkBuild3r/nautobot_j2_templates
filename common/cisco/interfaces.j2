@@ -114,7 +114,12 @@ interface {{ intf.name }}
 {# VLAN interface configuration from GraphQL data #}
 {% if inferred_mode == 'vlan' %}
 {% if intf.ip_addresses %}
- ip address {{ intf.ip_addresses[0].address | replace('/', ' ') | regex_replace('(\\d+\\.\\d+\\.\\d+\\.\\d+)/(\\d+)', '\\1 ' ~ cidr_to_netmask('\\2')) }}
+{% set ip_parts = intf.ip_addresses[0].address.split('/') %}
+{% if ip_parts | length == 2 %}
+ ip address {{ ip_parts[0] }} {{ ip_parts[1] | cidr_to_netmask }}
+{%- else %}
+ ! warning: Invalid IP address format for VLAN interface {{ intf.name }}
+{%- endif %}
 {%- else %}
  ! warning: No IP address defined for VLAN interface {{ intf.name }}
 {%- endif %}
@@ -133,7 +138,12 @@ interface {{ intf.name }}
 {% if inferred_mode == 'routed' %}
  no switchport
 {% if intf.ip_addresses %}
- ip address {{ intf.ip_addresses[0].address | replace('/', ' ') | regex_replace('(\\d+\\.\\d+\\.\\d+\\.\\d+)/(\\d+)', '\\1 ' ~ cidr_to_netmask('\\2')) }}
+{% set ip_parts = intf.ip_addresses[0].address.split('/') %}
+{% if ip_parts | length == 2 %}
+ ip address {{ ip_parts[0] }} {{ ip_parts[1] | cidr_to_netmask }}
+{%- else %}
+ ! warning: Invalid IP address format for routed interface {{ intf.name }}
+{%- endif %}
 {%- else %}
  ! warning: No IP address defined for routed interface {{ intf.name }}
 {%- endif %}
@@ -218,4 +228,4 @@ interface {{ intf.name }}
  shutdown
 {%- endif %}
 !
-{%- endfor %}
+{%- endfor %}+
