@@ -1,17 +1,17 @@
 {# common/cisco/interfaces.j2 #}
 {# Macro to render storm control configuration #}
 {%- macro render_storm_control(intf, is_uplink=False) %}
-{% if intf._custom_field_data.get('storm_control_level') not in [None, ''] %}
+{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
 {% endif %}
-{% if intf._custom_field_data.get('storm_control_action') not in [None, ''] %}
+{% if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {% set action_val = intf._custom_field_data.get('storm_control_action') %}
 {% if action_val is string %}
 {% set action = action_val %}
 {% elif action_val is iterable and action_val | length > 0 %}
 {% set action = action_val[0] %}
 {% else %}
-{% set action = None %}
+{% set action = none %}
 {% endif %}
 {% if action and action != 'drop' %}
  storm-control action {{ action }}
@@ -82,9 +82,8 @@ interface {{ intf.name }}
  description MANAGEMENT INTERFACE
 {% endif %}
 {# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED), access (untagged VLAN or ACCESS or TAGGED_ALL with no tagged_vlans), stackwise-virtual, or none #}
-{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else None %}
-{% set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not None else False %}
-{% set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
+{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
+{% set is_switchport = inferred_mode in ['access', 'trunk'] %}
 {# Stackwise-Virtual configuration #}
 {% if inferred_mode == 'stackwise-virtual' %}
 {% set sv_type = intf._custom_field_data.get('stackwise_virtual_type') %}
@@ -159,7 +158,7 @@ interface {{ intf.name }}
 {% endif %}
  switchport nonegotiate
 {% endif %}
-{% if intf._custom_field_data.get('storm_control_level') not in [None, ''] or intf._custom_field_data.get('storm_control_action') not in [None, ''] %}
+{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
 {% endif %}
 {% if intf._custom_field_data.get('portfast') %}
@@ -179,7 +178,7 @@ interface {{ intf.name }}
 {% endif %}
 {% endif %}
 {# Interface state #}
-{% if intf.enabled | default(True) %}
+{% if intf.enabled | default(true) %}
  no shutdown
 {% else %}
  shutdown
