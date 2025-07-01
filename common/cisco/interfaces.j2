@@ -1,6 +1,6 @@
 {# common/cisco/interfaces.j2 #}
-{# Macro to render storm control configuration #}
-{%- macro render_storm_control(intf, is_uplink=False) %}
+{# Macro to render storm control configuration based on GraphQL data #}
+{%- macro render_storm_control(intf) %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
 {% endif %}
@@ -19,12 +19,12 @@
 {% endif %}
 {%- endmacro %}
 
-{# Macro to render OSPF configuration #}
+{# Macro to render OSPF configuration based on GraphQL data #}
 {%- macro render_ospf(intf, ospf_config) %}
 {% if intf._custom_field_data.get('ospf_enabled') %}
 {% if intf.ip_addresses or intf.name.lower().startswith('vlan') %}
- ip ospf {{ ospf_config.process_id | default(1) }} area {{ intf._custom_field_data.get('ospf_area', ospf_config.area | default('0.0.0.0')) }}
-{% if intf._custom_field_data.get('apply_helper') and intf.name.lower() != 'vlan1000' %}
+ ip ospf {{ ospf_config.process_id | default(1) }} area {{ intf._custom_field_data.get('ospf_area', ospf_config.area) }}
+{% if intf._custom_field_data.get('apply_helper') %}
 {% if ospf_config.helper_addresses %}
 {% for helper in ospf_config.helper_addresses %}
  ip helper-address {{ helper }}
@@ -45,12 +45,12 @@
 {% endif %}
 {%- endmacro %}
 
-{# Aggregate all interfaces, including module interfaces if present #}
+{# Aggregate all interfaces from GraphQL data #}
 {% set device_ifcs = host.interfaces | default([]) %}
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
 {% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') %}
 
-{# Filter valid interfaces (no spaces or special characters) #}
+{# Filter valid interfaces (no spaces in names) to ensure sort_interface_list compatibility #}
 {% set valid_ifcs = [] %}
 {% for ifc in all_ifcs %}
 {% if ' ' not in ifc.name %}
@@ -60,43 +60,41 @@
 {% endif %}
 {% endfor %}
 
-{# OSPF configuration data #}
+{# OSPF configuration data from GraphQL #}
 {% set ospf_config = host.config_context.ospf | default({}) %}
 {% set ospf_interfaces = ospf_config.interfaces | default([]) | map(attribute='name') | list %}
 
-{# Order valid interfaces in Cisco-friendly order using sort_interface_list #}
+{# Order valid interfaces using sort_interface_list #}
 {% set ordered_names = valid_ifcs | map(attribute='name') | list | sort_interface_list %}
 {% set ordered_ifcs = [] %}
 {% for n in ordered_names %}
   {% set _ = ordered_ifcs.append(valid_ifcs | selectattr('name', 'equalto', n) | first) %}
 {% endfor %}
 
-{# Render all interfaces in sorted order #}
+{# Render all interfaces in sorted order based on GraphQL data #}
 {%- for intf in ordered_ifcs %}
 interface {{ intf.name }}
 {% if intf.description %}
  description {{ intf.description }}
 {% elif intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
  description TO {{ intf._custom_field_data.get('upstream_switch_hostname') }} {{ intf._custom_field_data.get('upstream_port_id') }}
-{% elif intf.name.lower() == 'vlan1000' %}
- description MANAGEMENT INTERFACE
 {% endif %}
-{# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED), access (untagged VLAN or ACCESS or TAGGED_ALL with no tagged_vlans), stackwise-virtual, or none #}
+{# Determine interface mode based on GraphQL data (ip_addresses, tagged_vlans, untagged_vlan, mode, stackwise_virtual_type) #}
 {% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
 {% set is_switchport = inferred_mode in ['access', 'trunk'] %}
-{# Stackwise-Virtual configuration #}
+{# Stackwise-Virtual configuration from GraphQL data #}
 {% if inferred_mode == 'stackwise-virtual' %}
 {% set sv_type = intf._custom_field_data.get('stackwise_virtual_type') %}
 {% set sv_id = intf._custom_field_data.get('stackwise_virtual_id') %}
 {% if sv_type == 'link' %}
- stackwise-virtual link {{ sv_id | default(loop.index) }}
+ stackwise-virtual link {{ sv_id | default(intf._custom_field_data.get('stackwise_virtual_id')) }}
 {% elif sv_type == 'dual-active-detection' %}
  stackwise-virtual dual-active-detection
 {% else %}
  ! warning: Invalid stackwise_virtual_type for {{ intf.name }}
 {% endif %}
 {% endif %}
-{# IP address for routed interfaces #}
+{# Routed interface configuration from GraphQL data #}
 {% if inferred_mode == 'routed' %}
  no switchport
 {% if intf.ip_addresses %}
@@ -104,7 +102,6 @@ interface {{ intf.name }}
 {% else %}
  ! warning: No IP address defined for routed interface {{ intf.name }}
 {% endif %}
-{# Management interface with VRF and DHCP #}
 {% if intf.vrf %}
  vrf forwarding {{ intf.vrf.name }}
 {% if intf._custom_field_data.get('dhcp_client') %}
@@ -116,7 +113,7 @@ interface {{ intf.name }}
 {% endif %}
 {{ render_ospf(intf, ospf_config) | indent(1) }}
 {% endif %}
-{# Switchport configuration #}
+{# Switchport configuration from GraphQL data #}
 {% if is_switchport %}
 {% if inferred_mode == 'access' %}
  switchport mode access
@@ -135,14 +132,10 @@ interface {{ intf.name }}
 {% endif %}
 {% if inferred_mode == 'trunk' %}
  switchport mode trunk
-{% if intf._custom_field_data.get('upstream_switch_hostname') and intf._custom_field_data.get('upstream_port_id') %}
- switchport trunk native vlan 1000
-{% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+{% if intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-{% elif is_uplink %}
- switchport trunk native vlan 1000
 {% else %}
- ! warning: No native VLAN defined for {{ intf.name }}
+ ! warning: No native VLAN defined for trunk interface {{ intf.name }}
 {% endif %}
 {% set vlan_list = [] %}
 {% if intf._custom_field_data.get('data_vlan') %}{% set _ = vlan_list.append(intf._custom_field_data.get('data_vlan')) %}{% endif %}
@@ -159,7 +152,7 @@ interface {{ intf.name }}
  switchport nonegotiate
 {% endif %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
-{{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
+{{ render_storm_control(intf) | indent(1) }}
 {% endif %}
 {% if intf._custom_field_data.get('portfast') %}
  spanning-tree portfast
@@ -173,12 +166,12 @@ interface {{ intf.name }}
 {% if intf._custom_field_data.get('dhcp_snooping_trust') %}
  ip dhcp snooping trust
 {% endif %}
-{% if is_uplink and intf.lag and intf.lag.name %}
+{% if intf.lag and intf.lag.name %}
  channel-group {{ intf.lag.name | replace('Port-channel', '') | lower }} mode active
 {% endif %}
 {% endif %}
-{# Interface state #}
-{% if intf.enabled | default(true) %}
+{# Interface state from GraphQL data #}
+{% if intf.enabled %}
  no shutdown
 {% else %}
  shutdown
