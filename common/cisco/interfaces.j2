@@ -1,15 +1,17 @@
+{# common/cisco/interfaces.j2 #}
+{# Macro to render storm control configuration #}
 {%- macro render_storm_control(intf, is_uplink=False) %}
-{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
+{% if intf._custom_field_data.get('storm_control_level') not in [None, ''] %}
  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
 {% endif %}
-{% if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
+{% if intf._custom_field_data.get('storm_control_action') not in [None, ''] %}
 {% set action_val = intf._custom_field_data.get('storm_control_action') %}
 {% if action_val is string %}
 {% set action = action_val %}
 {% elif action_val is iterable and action_val | length > 0 %}
 {% set action = action_val[0] %}
 {% else %}
-{% set action = none %}
+{% set action = None %}
 {% endif %}
 {% if action and action != 'drop' %}
  storm-control action {{ action }}
@@ -17,6 +19,7 @@
 {% endif %}
 {%- endmacro %}
 
+{# Macro to render OSPF configuration #}
 {%- macro render_ospf(intf, ospf_config) %}
 {% if intf._custom_field_data.get('ospf_enabled') %}
 {% if intf.ip_addresses or intf.name.lower().startswith('vlan') %}
@@ -47,15 +50,23 @@
 {% set module_ifcs = host.all_modules | default([]) | map(attribute='interfaces') | sum(start=[]) %}
 {% set all_ifcs = (device_ifcs + module_ifcs) | unique(attribute='name') %}
 
+{# Filter valid interfaces (alphanumeric, slashes, hyphens only, no spaces) #}
+{% set valid_ifcs = all_ifcs | selectattr('name', 'match', '^[a-zA-Z0-9\/\-]+$') %}
+{% for ifc in all_ifcs %}
+{% if ifc.name not in (valid_ifcs | map(attribute='name') | list) %}
+ ! warning: Skipping invalid interface name: {{ ifc.name }}
+{% endif %}
+{% endfor %}
+
 {# OSPF configuration data #}
 {% set ospf_config = host.config_context.ospf | default({}) %}
 {% set ospf_interfaces = ospf_config.interfaces | default([]) | map(attribute='name') | list %}
 
-{# Order interfaces in Cisco-friendly order using sort_interface_list #}
-{% set ordered_names = all_ifcs | map(attribute='name') | list | sort_interface_list %}
+{# Order valid interfaces in Cisco-friendly order using sort_interface_list #}
+{% set ordered_names = valid_ifcs | map(attribute='name') | list | sort_interface_list %}
 {% set ordered_ifcs = [] %}
 {% for n in ordered_names %}
-  {% set _ = ordered_ifcs.append(all_ifcs | selectattr('name', 'equalto', n) | first) %}
+  {% set _ = ordered_ifcs.append(valid_ifcs | selectattr('name', 'equalto', n) | first) %}
 {% endfor %}
 
 {# Render all interfaces in sorted order #}
@@ -69,8 +80,8 @@ interface {{ intf.name }}
  description MANAGEMENT INTERFACE
 {% endif %}
 {# Determine interface mode: routed (IP, no VLANs), trunk (tagged VLANs or TAGGED), access (untagged VLAN or ACCESS or TAGGED_ALL with no tagged_vlans), stackwise-virtual, or none #}
-{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else none %}
-{% set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not none else false %}
+{% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else None %}
+{% set is_switchport = inferred_mode in ['access', 'trunk'] if inferred_mode is not None else False %}
 {% set is_uplink = intf.name.lower().startswith('port-channel') or (intf.lag and intf.lag.name) %}
 {# Stackwise-Virtual configuration #}
 {% if inferred_mode == 'stackwise-virtual' %}
@@ -96,8 +107,8 @@ interface {{ intf.name }}
 {% if intf.vrf %}
  vrf forwarding {{ intf.vrf.name }}
 {% if intf._custom_field_data.get('dhcp_client') %}
- ip dhcp client client-id ascii {{ intf._custom_field_data.get('client_id') }}
- ip dhcp client hostname {{ intf._custom_field_data.get('hostname') }}
+ ip dhcp client client-id ascii {{ intf._custom_field_data.get('client_id') | default(host.hostname) }}
+ ip dhcp client hostname {{ intf._custom_field_data.get('hostname') | default(host.hostname) }}
  ip address dhcp
  negotiation auto
 {% endif %}
@@ -141,10 +152,12 @@ interface {{ intf.name }}
  switchport trunk allowed vlan {{ vlan_list | sort | join(',') }}
 {% elif intf.tagged_vlans and intf.tagged_vlans | length > 0 %}
  switchport trunk allowed vlan {{ intf.tagged_vlans | map(attribute='vid') | sort | join(',') }}
+{% else %}
+ ! warning: No allowed VLANs defined for trunk interface {{ intf.name }}
 {% endif %}
  switchport nonegotiate
 {% endif %}
-{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
+{% if intf._custom_field_data.get('storm_control_level') not in [None, ''] or intf._custom_field_data.get('storm_control_action') not in [None, ''] %}
 {{ render_storm_control(intf, is_uplink=is_uplink) | indent(1) }}
 {% endif %}
 {% if intf._custom_field_data.get('portfast') %}
@@ -164,7 +177,7 @@ interface {{ intf.name }}
 {% endif %}
 {% endif %}
 {# Interface state #}
-{% if intf.enabled | default(true) %}
+{% if intf.enabled | default(True) %}
  no shutdown
 {% else %}
  shutdown
