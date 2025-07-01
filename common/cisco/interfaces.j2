@@ -116,7 +116,7 @@ interface {{ intf.name }}
 {% if intf.ip_addresses %}
 {% set ip_parts = intf.ip_addresses[0].address.split('/') %}
 {% if ip_parts | length == 2 %}
- ip address {{ ip_parts[0] }} {{ ip_parts[1] | cidr_to_netmask }}
+ ip address {{ ip_parts[0] }} {{ ip_parts[1] | int | cidr_to_netmask }}
 {%- else %}
  ! warning: Invalid IP address format for VLAN interface {{ intf.name }}
 {%- endif %}
@@ -140,7 +140,7 @@ interface {{ intf.name }}
 {% if intf.ip_addresses %}
 {% set ip_parts = intf.ip_addresses[0].address.split('/') %}
 {% if ip_parts | length == 2 %}
- ip address {{ ip_parts[0] }} {{ ip_parts[1] | cidr_to_netmask }}
+ ip address {{ ip_parts[0] }} {{ ip_parts[1] | int | cidr_to_netmask }}
 {%- else %}
  ! warning: Invalid IP address format for routed interface {{ intf.name }}
 {%- endif %}
@@ -228,4 +228,4 @@ interface {{ intf.name }}
  shutdown
 {%- endif %}
 !
-{%- endfor %}+
+{%- endfor %}
