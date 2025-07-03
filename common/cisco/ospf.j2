@@ -1,12 +1,5 @@
-{# OSPF process configuration for {{ host.hostname|default('unknown device') }}#}
-
-{% set ospf_interfaces = host.config_context.ospf.interfaces|default([])|map(attribute='name')|list %}
-{% set device_interfaces = host.interfaces|map(attribute='name')|list %}
-{% if host.config_context.ospf and host.config_context.ospf.interfaces %}
-{% for ospf_intf in host.config_context.ospf.interfaces if ospf_intf.name not in device_interfaces %}
- ! interface {{ ospf_intf.name }} in OSPF config but not assigned to device, skipping network statement
-{% endfor %}
-{% endif %}
+{# OSPF process configuration for {{ host.hostname|default('unknown device') }} #}
+!
 {% if host.config_context.ospf and host.config_context.ospf.loopback_ip and host.config_context.ospf.area %}
 router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
  router-id {{ host.config_context.ospf.loopback_ip }}
@@ -22,6 +15,7 @@ router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
 {% else %}
  ! missing area_type in ospf_group
 {% endif %}
+{% set ospf_interfaces = host.config_context.ospf.interfaces|default([])|map(attribute='name')|list %}
 {% for intf in host.interfaces if intf.name in ospf_interfaces and intf.ip_addresses %}
 {% set ip_parts = intf.ip_addresses[0].address.split('/') %}
 {% set ip = ip_parts[0] %}
@@ -31,6 +25,7 @@ router ospf {{ host.config_context.ospf_group.process_id|default(1) }}
  {% set mask = (2 ** (32 - prefix) - 1)|ip_wildcard %}
  {% set wildcard = mask %}
 {% endif %}
+
  network {{ ip }} {{ wildcard }} area {{ host.config_context.ospf.area }}
 {% endfor %}
 {% else %}

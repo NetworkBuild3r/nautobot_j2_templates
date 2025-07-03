@@ -18,17 +18,19 @@
 {% else %}
 ! DNS not defined in config_context.dns
 {% endif %}
-!
+
 {% if host.config_context is defined and host.config_context.stp is defined %}
 {% include 'common/cisco/spanning_tree.j2' %}
 {% else %}
 ! Spanning-tree not defined in config_context.stp
 {% endif %}
-!
-{% if host.config_context is defined and host.config_context.interfaces is defined %}
+
+{% if host.interfaces is defined and host.interfaces | length > 0 %}
+{% with interfaces = host.interfaces %}
 {% include 'common/cisco/interfaces.j2' %}
+{% endwith %}
 {% else %}
-! Interfaces not defined in host.interfaces
+! No interfaces defined in host.interfaces
 {% endif %}
 !
 {% if host.config_context is defined and host.config_context.cisco_snmp_ios is defined %}

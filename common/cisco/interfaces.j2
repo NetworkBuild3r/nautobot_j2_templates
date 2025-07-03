@@ -4,7 +4,7 @@
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {% if intf._custom_field_data.get('storm_control_level') not in [none, ''] %}
  storm-control broadcast level {{ intf._custom_field_data.get('storm_control_level') }}.00
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {% set action_val = intf._custom_field_data.get('storm_control_action') %}
 {% if action_val is string %}
@@ -13,9 +13,9 @@
 {% set action = action_val[0] %}
 {% else %}
 {% set action = none %}
-{% endif %}
+{%- endif %}
 {%- if action and action != 'drop' %}
- storm-control action {{ action }}
+storm-control action {{ action }}
 {%- endif %}
 {% endif %}
 {%- endif %}
@@ -87,7 +87,7 @@
 {% set ordered_names = ordered_physical_names + ordered_logical_names %}
 {% set ordered_ifcs = [] %}
 {% for n in ordered_names %}
-{% set _ = ordered_ifcs.append(valid_ifcs | selectattr('name', 'equalto', n) | first) %}
+{%- set _ = ordered_ifcs.append(valid_ifcs | selectattr('name', 'equalto', n) | first) -%}
 {%- endfor %}
 
 {# Render all interfaces in sorted order based on GraphQL data #}
@@ -95,7 +95,7 @@
 interface {{ intf.name }}
 {% if intf.description %}
  description {{ intf.description }}
-{%- endif %}
+{% endif %}
 {# Determine interface mode based on GraphQL data #}
 {% set inferred_mode = 'routed' if intf.ip_addresses and not (intf.untagged_vlan or intf.tagged_vlans or intf.name.lower().startswith('vlan')) else 'trunk' if (intf.tagged_vlans and intf.tagged_vlans | length > 0 or intf.mode == 'TAGGED') else 'access' if (intf.untagged_vlan or intf.mode == 'ACCESS' or intf.mode == 'TAGGED_ALL') else 'stackwise-virtual' if intf._custom_field_data.get('stackwise_virtual_type') else 'vlan' if intf.name.lower().startswith('vlan') else none %}
 {% set is_switchport = inferred_mode in ['access', 'trunk'] %}
@@ -130,7 +130,7 @@ interface {{ intf.name }}
  ip dhcp client hostname {{ intf._custom_field_data.get('hostname') | default(host.hostname) }}
  ip address dhcp
  negotiation auto
-{%- endif %}
+{% endif %}
 {%- endif %}
 {{ render_ospf(intf, ospf_config) | indent(1) }}
 {%- endif %}
@@ -141,12 +141,12 @@ interface {{ intf.name }}
 {% set ip_parts = intf.ip_addresses[0].address.split('/') %}
 {% if ip_parts | length == 2 %}
  ip address {{ ip_parts[0] }} {{ ip_parts[1] | int | cidr_to_netmask }}
-{%- else %}
+{% else %}
  ! warning: Invalid IP address format for routed interface {{ intf.name }}
-{%- endif %}
-{%- else %}
+{% endif %}
+{% else %}
  ! warning: No IP address defined for routed interface {{ intf.name }}
-{%- endif %}
+{% endif %}
 {% if intf.vrf %}
  vrf forwarding {{ intf.vrf.name }}
 {% if intf._custom_field_data.get('dhcp_client') %}
@@ -164,20 +164,20 @@ interface {{ intf.name }}
  switchport mode access
 {% if intf._custom_field_data.get('vlan_type') in ['data', 'video', 'security'] and intf._custom_field_data.get(intf._custom_field_data.vlan_type + '_vlan') %}
  switchport access vlan {{ intf._custom_field_data[intf._custom_field_data.vlan_type + '_vlan'] }}
-{%- elif intf.untagged_vlan and intf.untagged_vlan.vid %}
+{% elif intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport access vlan {{ intf.untagged_vlan.vid }}
-{%- else %}
+{% else %}
  ! warning: No access VLAN defined for {{ intf.name }}
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('cf_voice_vlan') %}
  switchport voice vlan {{ intf._custom_field_data.get('cf_voice_vlan') }}
-{%- endif %}
-{%- endif %}
+{% endif %}
+{% endif %}
 {% if inferred_mode == 'trunk' %}
  switchport mode trunk
 {% if intf.untagged_vlan and intf.untagged_vlan.vid %}
  switchport trunk native vlan {{ intf.untagged_vlan.vid }}
-{%- else %}
+{% else %}
  ! warning: No native VLAN defined for trunk interface {{ intf.name }}
 {%- endif %}
 {% set vlan_list = [] %}
@@ -202,30 +202,30 @@ interface {{ intf.name }}
 {%- endif %}
  switchport nonegotiate
 {%- endif %}
-{% if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
+{%- if intf._custom_field_data.get('storm_control_level') not in [none, ''] or intf._custom_field_data.get('storm_control_action') not in [none, ''] %}
 {{ render_storm_control(intf) | indent(1) }}
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('portfast') %}
  spanning-tree portfast
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('bpduguard') %}
  spanning-tree bpduguard enable
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('dhcp_snooping_limit') %}
  ip dhcp snooping limit rate {{ intf._custom_field_data.get('dhcp_snooping_limit') }}
-{%- endif %}
+{% endif %}
 {% if intf._custom_field_data.get('dhcp_snooping_trust') %}
  ip dhcp snooping trust
-{%- endif %}
+{% endif %}
 {% if intf.lag and intf.lag.name %}
  channel-group {{ intf.lag.name | replace('Port-channel', '') | lower }} mode active
 {%- endif %}
-{%- endif %}
+{% endif %}
 {# Interface state from GraphQL data #}
 {% if intf.enabled %}
  no shutdown
-{%- else %}
+{% else %}
  shutdown
-{%- endif %}
+{% endif %}
 !
-{%- endfor %}
+{% endfor %}
